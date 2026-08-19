@@ -1,0 +1,124 @@
+// Countersign demo — data model
+// Adjusted from the source spec for Prisma/Next.js convention:
+//   - camelCase fields (Prisma convention) instead of snake_case
+//   - free-text `status` / `template_type` / `party_role` / `event_type` columns
+//     promoted to enums for compile-time safety
+//   - ids are cuid() strings, not auto-increment ints (matches how they'll be
+//     used in public signing URLs)
+//   - Document gains `pdfData` (raw PDF bytes) alongside `pdfUrl`, since the
+//     demo has no external object storage — pdfUrl just points at the API
+//     route that streams pdfData back out
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  GENERAL_COUNSEL
+  CONTRACTS_MANAGER
+  BUSINESS_AFFAIRS
+  PARALEGAL
+}
+
+enum TemplateType {
+  NDA
+  VENDOR_AGREEMENT
+  MEDIA_RELEASE
+  LICENSING_ORDER
+}
+
+enum DocumentStatus {
+  DRAFT
+  SENT
+  PARTIALLY_SIGNED
+  FULLY_EXECUTED
+}
+
+enum PartyRole {
+  COMPANY
+  COUNTERPARTY
+}
+
+enum StatusEventType {
+  CREATED
+  SENT
+  VIEWED
+  SIGNED
+  FULLY_EXECUTED
+}
+
+model Sender {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      Role
+  createdAt DateTime @default(now())
+
+  documents Document[]
+  user      User?
+}
+
+// Login identity, separate from Sender: a User authenticates and maps 1:1
+// onto the Sender they act as (mirrors how a real e-signature product ties
+// an account to a team member's identity).
+model User {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
+  senderId     String @unique
+
+  sender Sender @relation(fields: [senderId], references: [id])
+}
+
+model Document {
+  id                String   @id @default(cuid())
+  title             String
+  templateType      TemplateType
+  senderId          String
+  counterpartyName  String
+  counterpartyEmail String
+  status            DocumentStatus @default(DRAFT)
+  createdAt         DateTime @default(now())
+  sentAt            DateTime?
+  completedAt       DateTime?
+  pdfUrl            String?
+  pdfData           Bytes?
+
+  sender       Sender        @relation(fields: [senderId], references: [id])
+  signers      Signer[]
+  statusEvents StatusEvent[]
+
+  @@index([senderId])
+  @@index([status])
+}
+
+model Signer {
+  id             String    @id @default(cuid())
+  documentId     String
+  partyRole      PartyRole
+  name           String
+  email          String
+  signedAt       DateTime?
+  signatureData  String?
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model StatusEvent {
+  id         String          @id @default(cuid())
+  documentId String
+  eventType  StatusEventType
+  actor      String
+  timestamp  DateTime        @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
