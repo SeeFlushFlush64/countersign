@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 
 // Lightweight instance: Edge-safe, no Credentials provider / Prisma import,
-// so it can run here without pulling in better-sqlite3.
+// so it can run here without pulling in the pg driver.
 export default NextAuth(authConfig).auth;
 
 export const config = {
