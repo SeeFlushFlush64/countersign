@@ -9,6 +9,11 @@ import type { TemplateType } from "@/generated/prisma/enums";
 
 export class DocumentFlowError extends Error {}
 
+// Every lifecycle step takes an optional clock so a caller (the seed, tests)
+// can drive the real transitions at fixed times. One `now` per step keeps the
+// row timestamps and the event timestamps of that step identical.
+export type Clock = { now?: Date };
+
 async function generateAndStorePdf(documentId: string) {
   const document = await prisma.document.findUniqueOrThrow({
     where: { id: documentId },
@@ -58,13 +63,14 @@ export async function createDocument(input: {
   title: string;
   counterpartyName: string;
   counterpartyEmail: string;
-}) {
+}, { now = new Date() }: Clock = {}) {
   const sender = await prisma.sender.findUniqueOrThrow({
     where: { id: input.senderId },
   });
 
   const document = await prisma.document.create({
     data: {
+      createdAt: now,
       title: input.title,
       templateType: input.templateType,
       senderId: input.senderId,
@@ -90,6 +96,7 @@ export async function createDocument(input: {
           {
             eventType: StatusEventType.CREATED,
             actor: sender.name,
+            timestamp: now,
           },
         ],
       },
@@ -101,7 +108,10 @@ export async function createDocument(input: {
   return document;
 }
 
-export async function sendDocument(documentId: string) {
+export async function sendDocument(
+  documentId: string,
+  { now = new Date() }: Clock = {},
+) {
   const document = await prisma.document.findUniqueOrThrow({
     where: { id: documentId },
     include: { sender: true },
@@ -114,19 +124,23 @@ export async function sendDocument(documentId: string) {
   await prisma.$transaction([
     prisma.document.update({
       where: { id: documentId },
-      data: { status: DocumentStatus.SENT, sentAt: new Date() },
+      data: { status: DocumentStatus.SENT, sentAt: now },
     }),
     prisma.statusEvent.create({
       data: {
         documentId,
         eventType: StatusEventType.SENT,
         actor: document.sender.name,
+        timestamp: now,
       },
     }),
   ]);
 }
 
-export async function recordView(signerId: string) {
+export async function recordView(
+  signerId: string,
+  { now = new Date() }: Clock = {},
+) {
   const signer = await prisma.signer.findUniqueOrThrow({
     where: { id: signerId },
   });
@@ -145,12 +159,17 @@ export async function recordView(signerId: string) {
         documentId: signer.documentId,
         eventType: StatusEventType.VIEWED,
         actor: signer.name,
+        timestamp: now,
       },
     });
   }
 }
 
-export async function signAsSigner(signerId: string, signatureData: string) {
+export async function signAsSigner(
+  signerId: string,
+  signatureData: string,
+  { now = new Date() }: Clock = {},
+) {
   const signer = await prisma.signer.findUniqueOrThrow({
     where: { id: signerId },
     include: { document: { include: { signers: true } } },
@@ -184,8 +203,6 @@ export async function signAsSigner(signerId: string, signatureData: string) {
     }
   }
 
-  const now = new Date();
-
   await prisma.signer.update({
     where: { id: signerId },
     data: { signedAt: now, signatureData },
@@ -196,6 +213,7 @@ export async function signAsSigner(signerId: string, signatureData: string) {
       documentId: document.id,
       eventType: StatusEventType.SIGNED,
       actor: signer.name,
+      timestamp: now,
     },
   });
 
@@ -212,6 +230,7 @@ export async function signAsSigner(signerId: string, signatureData: string) {
         documentId: document.id,
         eventType: StatusEventType.FULLY_EXECUTED,
         actor: "Countersign",
+        timestamp: now,
       },
     });
   } else if (document.status === DocumentStatus.SENT) {
