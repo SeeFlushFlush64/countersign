@@ -24,6 +24,7 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
   SENT: "Sent",
   PARTIALLY_SIGNED: "Partially Signed",
   FULLY_EXECUTED: "Fully Executed",
+  VOIDED: "Voided",
 };
 
 export const STATUS_EVENT_LABELS: Record<StatusEventType, string> = {
@@ -32,4 +33,6 @@ export const STATUS_EVENT_LABELS: Record<StatusEventType, string> = {
   VIEWED: "Document viewed",
   SIGNED: "Signature captured",
   FULLY_EXECUTED: "Fully executed",
+  LINK_REISSUED: "Signing link reissued",
+  VOIDED: "Agreement voided",
 };

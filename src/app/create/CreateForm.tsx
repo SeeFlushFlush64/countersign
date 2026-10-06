@@ -5,6 +5,7 @@ import { createDocumentAction, type CreateDocumentState } from "./actions";
 import { TEMPLATE_TYPE_LABELS } from "@/lib/labels";
 import { TemplateType } from "@/generated/prisma/enums";
 import { initials } from "@/lib/format";
+import { LIMITS } from "@/lib/validation";
 
 const initialState: CreateDocumentState = { error: null };
 
@@ -71,12 +72,14 @@ export function CreateForm({
           <Field
             label="Counterparty name"
             name="counterpartyName"
+            maxLength={LIMITS.counterpartyName}
             placeholder="Ashgrove Creative LLC"
             required
           />
           <Field
             label="Counterparty email"
             name="counterpartyEmail"
+            maxLength={LIMITS.email}
             type="email"
             placeholder="contact@ashgrovecreative.com"
             required
@@ -84,6 +87,7 @@ export function CreateForm({
           <Field
             label="Document title (optional)"
             name="title"
+            maxLength={LIMITS.title}
             placeholder="Auto-generated from template + counterparty"
           />
         </div>
@@ -138,12 +142,14 @@ function Field({
   type = "text",
   placeholder,
   required,
+  maxLength,
 }: {
   label: string;
   name: string;
   type?: string;
   placeholder?: string;
   required?: boolean;
+  maxLength?: number;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -153,6 +159,7 @@ function Field({
         type={type}
         placeholder={placeholder}
         required={required}
+        maxLength={maxLength}
         className="rounded-md border border-panel-border bg-ink px-3 py-2 text-sm text-paper placeholder:text-slate-dim focus:border-signal focus:outline-none"
       />
     </label>

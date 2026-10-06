@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { CreateForm } from "./CreateForm";
 import { StatusStrip } from "@/components/StatusStrip";
@@ -10,8 +9,7 @@ import type { Role } from "@/generated/prisma/enums";
 export const dynamic = "force-dynamic";
 
 export default async function CreatePage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const { session } = await requireUser();
 
   const signatories = await prisma.user.findMany({
     where: { isSignatory: true },

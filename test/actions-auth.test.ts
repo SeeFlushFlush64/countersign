@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DocumentStatus } from "@/generated/prisma/enums";
+import { prisma } from "@/lib/prisma";
 import { expectPrivateEmptyDatabase } from "./harness/private-database";
 import {
   COMPANY_SIGNATURE,
@@ -20,10 +21,16 @@ const session = vi.hoisted(() => ({ current: null as null | { user: Record<strin
 vi.mock("@/auth", () => ({ auth: vi.fn(async () => session.current) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/headers", () => ({
+  headers: async () =>
+    new Headers({ "user-agent": "vitest-agent", "x-forwarded-for": "203.0.113.9" }),
+}));
 
 const { countersignAction } = await import("@/app/documents/[id]/countersign/actions");
-const { sendDocumentAction } = await import("@/app/documents/[id]/actions");
-const { signAction } = await import("@/app/sign/[signerId]/actions");
+const { sendDocumentAction, reissueLinkAction, voidDocumentAction } = await import(
+  "@/app/documents/[id]/actions"
+);
+const { signLinkAction } = await import("@/app/s/[token]/actions");
 
 let company: Company;
 
@@ -76,22 +83,108 @@ describe("sendDocumentAction", () => {
   it("refuses an unauthenticated caller", async () => {
     const a = await makeAgreement(company, "draft");
     const result = await sendDocumentAction(a.id);
-    expect(result).toEqual({ error: "Sign in to send this agreement." });
+    expect(result).toEqual({ error: "Sign in to send this agreement.", signingPath: null });
     expect((await stateOf(a.id)).status).toBe(DocumentStatus.DRAFT);
   });
 });
 
-describe("signAction (public counterparty action)", () => {
-  it("cannot be used with the company signer's id", async () => {
+describe("link management actions", () => {
+  const reasonForm = (reason: string) => {
+    const form = new FormData();
+    form.set("reason", reason);
+    return form;
+  };
+
+  it("send returns the signing link once, to a signed-in manager", async () => {
+    const a = await makeAgreement(company, "draft");
+    signedInAs(company.paralegal.userId);
+    const result = await sendDocumentAction(a.id);
+    expect(result.error).toBeNull();
+    expect(result.signingPath).toMatch(/^\/s\/[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("reissue refuses an unauthenticated caller", async () => {
+    const a = await makeAgreement(company, "sent");
+    const result = await reissueLinkAction(a.id, a.linkId);
+    expect(result).toEqual({ error: "Sign in to reissue the signing link.", signingPath: null });
+    expect(await prisma.signingLink.count({ where: { documentId: a.id } })).toBe(1);
+  });
+
+  it("void refuses an unauthenticated caller and a missing reason", async () => {
+    const a = await makeAgreement(company, "sent");
+    expect(await voidDocumentAction(a.id, { error: null, voided: false }, reasonForm("Valid reason"))).toEqual({
+      error: "Sign in to void this agreement.",
+      voided: false,
+    });
+
+    signedInAs(company.paralegal.userId);
+    const blank = await voidDocumentAction(a.id, { error: null, voided: false }, reasonForm("   "));
+    expect(blank.error).toMatch(/at least 3 characters/);
+    expect((await prisma.document.findUniqueOrThrow({ where: { id: a.id } })).status).toBe("SENT");
+  });
+
+  it("void records the reason from the submitted form", async () => {
+    const a = await makeAgreement(company, "sent");
+    signedInAs(company.signatory.userId);
+    const result = await voidDocumentAction(
+      a.id,
+      { error: null, voided: false },
+      reasonForm("Replaced by a corrected agreement"),
+    );
+    expect(result).toEqual({ error: null, voided: true });
+    const row = await prisma.document.findUniqueOrThrow({ where: { id: a.id } });
+    expect(row.status).toBe("VOIDED");
+    expect(row.voidReason).toBe("Replaced by a corrected agreement");
+    expect(row.voidedById).toBe(company.signatory.userId);
+  });
+});
+
+describe("reissueLinkAction double-click", () => {
+  it("creates one new link; the repeated submit gets a clean conflict", async () => {
+    const a = await makeAgreement(company, "sent");
+    signedInAs(company.paralegal.userId);
+    // Both submits carry the link id the page rendered with.
+    const [first, second] = await Promise.all([
+      reissueLinkAction(a.id, a.linkId),
+      reissueLinkAction(a.id, a.linkId),
+    ]);
+    const results = [first, second];
+    expect(results.filter((r) => r.signingPath)).toHaveLength(1);
+    expect(results.filter((r) => r.error)).toEqual([
+      { error: expect.stringMatching(/already reissued/), signingPath: null },
+    ]);
+    expect(await prisma.signingLink.count({ where: { documentId: a.id } })).toBe(2);
+  });
+});
+
+describe("signLinkAction (public counterparty action)", () => {
+  it("cannot be used with a signer id instead of a link token", async () => {
     const a = await makeAgreement(company, "counterpartySigned");
-    const result = await signAction(a.companySignerId, a.frozenSha256, COMPANY_SIGNATURE);
-    expect(result?.error).toMatch(/countersigns from inside Countersign/);
+    const result = await signLinkAction(a.companySignerId, a.frozenSha256, COMPANY_SIGNATURE);
+    expect(result?.error).toBe("This signing link is not valid.");
     expect((await stateOf(a.id)).status).toBe(DocumentStatus.PARTIALLY_SIGNED);
   });
 
-  it("signs for the counterparty", async () => {
+  it("refuses while a company user is signed in (no accidental impersonation)", async () => {
     const a = await makeAgreement(company, "sent");
-    await signAction(a.counterpartySignerId, a.frozenSha256, COUNTERPARTY_SIGNATURE);
+    signedInAs(company.paralegal.userId);
+    const result = await signLinkAction(a.token, a.frozenSha256, COUNTERPARTY_SIGNATURE);
+    expect(result?.error).toMatch(/signed in to Countersign as a company user/);
+    expect((await stateOf(a.id)).status).toBe(DocumentStatus.SENT);
+  });
+
+  it("signs for the counterparty, recording the link and a hashed IP (never the raw IP)", async () => {
+    const a = await makeAgreement(company, "sent");
+    await signLinkAction(a.token, a.frozenSha256, COUNTERPARTY_SIGNATURE);
     expect((await stateOf(a.id)).status).toBe(DocumentStatus.PARTIALLY_SIGNED);
+
+    const event = await prisma.statusEvent.findFirstOrThrow({
+      where: { documentId: a.id, eventType: "SIGNED" },
+    });
+    expect(event.actorType).toBe("COUNTERPARTY_LINK");
+    expect(event.signingLinkId).toBe(a.linkId);
+    const metadata = event.metadata as { ipHash: string | null; userAgent: string | null };
+    expect(metadata.userAgent).toBe("vitest-agent");
+    expect(JSON.stringify(event.metadata)).not.toContain("203.0.113.9");
   });
 });

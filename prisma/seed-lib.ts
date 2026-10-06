@@ -5,9 +5,10 @@ import type { TemplateType } from "../src/generated/prisma/enums";
 import {
   countersign,
   createDocument,
-  recordView,
+  voidDocument,
+  recordLinkView,
   sendDocument,
-  signAsCounterparty,
+  signWithLink,
 } from "../src/lib/documents";
 import { signatureDataUrl } from "./png-signature";
 
@@ -43,9 +44,10 @@ export const SCHEDULE = {
   counterpartyViewed: 2,
   counterpartySigned: 3,
   companySigned: 26,
+  voided: 30,
 } as const;
 
-export type SeedStage = "draft" | "sent" | "counterpartySigned" | "executed";
+export type SeedStage = "draft" | "sent" | "counterpartySigned" | "executed" | "voided";
 
 export type SeedDocument = {
   senderEmail: string;
@@ -55,6 +57,8 @@ export type SeedDocument = {
   counterpartyEmail: string;
   stage: SeedStage;
   createdHoursAgo: number;
+  // Required for stage "voided".
+  voidReason?: string;
 };
 
 export const SEED_SENDERS = [
@@ -110,6 +114,16 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     stage: "executed",
     createdHoursAgo: 8 * 24,
   },
+  {
+    senderEmail: "priya.anand@northlightmedia.com",
+    templateType: "VENDOR_AGREEMENT",
+    title: "Vendor Services Agreement — Halcyon Catering Co.",
+    counterpartyName: "Halcyon Catering Co.",
+    counterpartyEmail: "events@halcyon-catering.example",
+    stage: "voided",
+    createdHoursAgo: 6 * 24,
+    voidReason: "Counterparty's legal entity name was wrong; a corrected agreement will be sent.",
+  },
 ];
 
 const STAGE_FOR_STATUS: Record<DocumentStatus, SeedStage> = {
@@ -117,6 +131,7 @@ const STAGE_FOR_STATUS: Record<DocumentStatus, SeedStage> = {
   SENT: "sent",
   PARTIALLY_SIGNED: "counterpartySigned",
   FULLY_EXECUTED: "executed",
+  VOIDED: "voided",
 };
 
 // The last lifecycle step each stage reaches, as an offset from creation.
@@ -125,6 +140,7 @@ const LAST_STEP_HOURS: Record<SeedStage, number> = {
   sent: SCHEDULE.sent,
   counterpartySigned: SCHEDULE.counterpartySigned,
   executed: SCHEDULE.companySigned,
+  voided: SCHEDULE.voided,
 };
 
 export type SeedReport = {
@@ -157,6 +173,7 @@ async function seedDocument(
   spec: SeedDocument,
   senderId: string,
   signatoryUserId: string,
+  creatorUserId: string | undefined,
   anchor: Date,
   report: SeedReport,
   log: (line: string) => void,
@@ -198,6 +215,9 @@ async function seedDocument(
     {
       senderId,
       countersignerId: signatoryUserId,
+      // Recorded as the sender's own login where one exists, otherwise as a
+      // SYSTEM (seed) event.
+      createdByUserId: creatorUserId,
       templateType: spec.templateType,
       title: spec.title,
       counterpartyName: spec.counterpartyName,
@@ -208,19 +228,23 @@ async function seedDocument(
 
   const signatory = { userId: signatoryUserId };
   let frozenSha256 = "";
+  let signingToken = "";
+  let signingLinkId = "";
   if (spec.stage !== "draft") {
-    ({ frozenSha256 } = await sendDocument(document.id, signatory, {
+    ({ frozenSha256, signingToken, signingLinkId } = await sendDocument(document.id, signatory, {
       now: at(SCHEDULE.sent),
     }));
   }
 
   if (spec.stage === "counterpartySigned" || spec.stage === "executed") {
-    // Sequential signing: the counterparty views and signs first…
+    // Sequential signing: the counterparty opens their link and signs
+    // first… (the token is used here and never printed or stored)
     const counterparty = await signerFor(document.id, PartyRole.COUNTERPARTY);
-    await recordView(counterparty.id, { now: at(SCHEDULE.counterpartyViewed) });
-    await signAsCounterparty(
-      counterparty.id,
+    await recordLinkView(signingLinkId, {}, { now: at(SCHEDULE.counterpartyViewed) });
+    await signWithLink(
+      signingToken,
       { signature: signatureDataUrl(counterparty.name), expectedSha256: frozenSha256 },
+      {},
       { now: at(SCHEDULE.counterpartySigned) },
     );
   }
@@ -237,6 +261,11 @@ async function seedDocument(
     if (artifact.status !== "READY") {
       throw new Error(`Executed PDF for "${spec.title}" is ${artifact.status}.`);
     }
+  }
+
+  if (spec.stage === "voided") {
+    // Sent, then voided by the designated signatory with a reason.
+    await voidDocument(document.id, signatory, spec.voidReason, { now: at(SCHEDULE.voided) });
   }
 
   report.created.push(spec.title);
@@ -310,6 +339,9 @@ export async function seed({
     userIds.set(demo.email, existingUser.id);
   }
   const signatoryUserId = userIds.get(DEMO_LOGIN_EMAIL)!;
+  const userIdBySender = new Map(
+    DEMO_USERS.map((demo) => [demo.senderEmail as string, userIds.get(demo.email)!]),
+  );
 
   log("Seeding documents…");
   for (const spec of SEED_DOCUMENTS) {
@@ -317,6 +349,7 @@ export async function seed({
       spec,
       senderIds.get(spec.senderEmail)!,
       signatoryUserId,
+      userIdBySender.get(spec.senderEmail),
       anchor,
       report,
       log,

@@ -5,7 +5,7 @@ import {
   createDocument,
   DocumentFlowError,
   sendDocument,
-  signAsCounterparty,
+  signWithLink,
 } from "@/lib/documents";
 import { DocumentStatus } from "@/generated/prisma/enums";
 import { expectPrivateEmptyDatabase } from "./harness/private-database";
@@ -41,13 +41,24 @@ async function expectFlowError(promise: Promise<unknown>, code: string, message?
 describe("company countersignature authorization", () => {
   it("cannot be made through a signing link (the old anonymous path)", async () => {
     const a = await makeAgreement(company, "counterpartySigned");
+    // Links are only ever issued to the counterparty…
+    const links = await prisma.signingLink.findMany({
+      where: { documentId: a.id },
+      select: { signer: { select: { partyRole: true } } },
+    });
+    expect(links.map((l) => l.signer.partyRole)).toEqual(["COUNTERPARTY"]);
+    // …and the company signer's id (the old bearer credential) is not a link.
     await expectFlowError(
-      signAsCounterparty(a.companySignerId, {
+      signWithLink(a.companySignerId, {
         signature: COMPANY_SIGNATURE,
         expectedSha256: a.frozenSha256,
       }),
-      "FORBIDDEN",
-      /countersigns from inside Countersign/,
+      "LINK_INVALID",
+    );
+    // The counterparty's own (already used) link cannot add a second signature.
+    await expectFlowError(
+      signWithLink(a.token, { signature: COMPANY_SIGNATURE, expectedSha256: a.frozenSha256 }),
+      "CONFLICT",
     );
     expect((await stateOf(a.id)).status).toBe(DocumentStatus.PARTIALLY_SIGNED);
   });

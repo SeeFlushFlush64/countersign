@@ -8,6 +8,8 @@ const DOT_CLASS: Record<StatusEventType, string> = {
   VIEWED: "bg-slate-dim",
   SIGNED: "bg-signal",
   FULLY_EXECUTED: "bg-live",
+  LINK_REISSUED: "bg-alert",
+  VOIDED: "bg-danger",
 };
 
 export type TimelineEvent = {

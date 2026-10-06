@@ -6,7 +6,7 @@ import {
   DocumentFlowError,
   ORDER_VIOLATION_MESSAGE,
   sendDocument,
-  signAsCounterparty,
+  signWithLink,
 } from "@/lib/documents";
 import { DocumentStatus } from "@/generated/prisma/enums";
 import { expectPrivateEmptyDatabase } from "./harness/private-database";
@@ -53,7 +53,7 @@ describe("signing order", () => {
   it("executes when the counterparty signs first and the signatory countersigns", async () => {
     const a = await makeAgreement(company, "sent");
 
-    await signAsCounterparty(a.counterpartySignerId, {
+    await signWithLink(a.token, {
       signature: COUNTERPARTY_SIGNATURE,
       expectedSha256: a.frozenSha256,
     });
@@ -80,7 +80,7 @@ describe("signing order", () => {
   it("refuses a second counterparty signature and a second countersignature", async () => {
     const a = await makeAgreement(company, "counterpartySigned");
     await expect(
-      signAsCounterparty(a.counterpartySignerId, {
+      signWithLink(a.token, {
         signature: COUNTERPARTY_SIGNATURE,
         expectedSha256: a.frozenSha256,
       }),
@@ -102,7 +102,7 @@ describe("signing order", () => {
   it("treats an executed agreement as terminal", async () => {
     const a = await makeAgreement(company, "executed");
     await expect(
-      signAsCounterparty(a.counterpartySignerId, {
+      signWithLink(a.token, {
         signature: COUNTERPARTY_SIGNATURE,
         expectedSha256: a.frozenSha256,
       }),
@@ -112,20 +112,22 @@ describe("signing order", () => {
     ).rejects.toThrowError("Only draft agreements can be sent.");
   });
 
-  it("refuses any signature on a draft", async () => {
+  it("gives a draft no signing link, so nothing can sign it", async () => {
     const a = await makeAgreement(company, "draft");
+    expect(await prisma.signingLink.count({ where: { documentId: a.id } })).toBe(0);
+    // Not even the counterparty signer's raw id works as a link.
     await expect(
-      signAsCounterparty(a.counterpartySignerId, {
+      signWithLink(a.counterpartySignerId, {
         signature: COUNTERPARTY_SIGNATURE,
         expectedSha256: "0".repeat(64),
       }),
-    ).rejects.toThrowError("This agreement has not been sent for signature yet.");
+    ).rejects.toMatchObject({ code: "LINK_INVALID" });
   });
 
   it("refuses a signature bound to a different document hash", async () => {
     const a = await makeAgreement(company, "sent");
     await expect(
-      signAsCounterparty(a.counterpartySignerId, {
+      signWithLink(a.token, {
         signature: COUNTERPARTY_SIGNATURE,
         expectedSha256: "f".repeat(64),
       }),
@@ -149,17 +151,15 @@ describe("signing order", () => {
       },
       { now: t0 },
     );
-    const { frozenSha256 } = await sendDocument(
+    const { frozenSha256, signingToken } = await sendDocument(
       document.id,
       { userId: company.paralegal.userId },
       { now: t1 },
     );
-    const [counterparty] = await prisma.signer.findMany({
-      where: { documentId: document.id, partyRole: "COUNTERPARTY" },
-    });
-    await signAsCounterparty(
-      counterparty.id,
+    await signWithLink(
+      signingToken,
       { signature: COUNTERPARTY_SIGNATURE, expectedSha256: frozenSha256 },
+      {},
       { now: t2 },
     );
     await countersign(

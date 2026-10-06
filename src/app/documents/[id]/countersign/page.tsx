@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { notFound } from "next/navigation";
+import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { StatusStrip } from "@/components/StatusStrip";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDateTime } from "@/lib/format";
 import { DocumentStatus, PartyRole } from "@/generated/prisma/enums";
-import { SignForm } from "@/app/sign/[signerId]/SignForm";
+import { SignForm } from "@/components/SignForm";
 import { countersignAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +17,7 @@ export default async function CountersignPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) redirect(`/login?callbackUrl=/documents/${id}/countersign`);
+  const { session } = await requireUser();
 
   const document = await prisma.document.findUnique({
     where: { id },
@@ -46,6 +45,8 @@ export default async function CountersignPage({
         countersign this agreement.
       </p>
     );
+  } else if (document.status === DocumentStatus.VOIDED) {
+    body = <p className="text-sm text-slate">This agreement was voided and cannot be countersigned.</p>;
   } else if (document.status === DocumentStatus.DRAFT || document.status === DocumentStatus.SENT) {
     body = (
       <p className="text-sm text-slate">

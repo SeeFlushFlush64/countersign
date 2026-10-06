@@ -26,6 +26,7 @@ const EXPECTED_STATUS = {
   sent: DocumentStatus.SENT,
   counterpartySigned: DocumentStatus.PARTIALLY_SIGNED,
   executed: DocumentStatus.FULLY_EXECUTED,
+  voided: DocumentStatus.VOIDED,
 } as const;
 
 async function snapshot() {
@@ -105,6 +106,8 @@ describe("seed", () => {
       expect(row.completedAt).toEqual(
         spec.stage === "executed" ? at(SCHEDULE.companySigned) : null,
       );
+      expect(row.voidedAt).toEqual(spec.stage === "voided" ? at(SCHEDULE.voided) : null);
+      expect(row.voidReason).toBe(spec.stage === "voided" ? spec.voidReason : null);
 
       const counterparty = row.signers.find((s) => s.partyRole === PartyRole.COUNTERPARTY)!;
       const company = row.signers.find((s) => s.partyRole === PartyRole.COMPANY)!;

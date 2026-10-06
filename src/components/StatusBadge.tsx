@@ -6,6 +6,7 @@ const DOT_CLASS: Record<DocumentStatus, string> = {
   SENT: "bg-alert",
   PARTIALLY_SIGNED: "bg-alert",
   FULLY_EXECUTED: "bg-live",
+  VOIDED: "bg-danger",
 };
 
 export function StatusBadge({ status }: { status: DocumentStatus }) {

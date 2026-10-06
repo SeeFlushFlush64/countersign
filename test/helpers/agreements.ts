@@ -4,7 +4,7 @@ import {
   countersign,
   createDocument,
   sendDocument,
-  signAsCounterparty,
+  signWithLink,
 } from "@/lib/documents";
 import { DocumentFlowError } from "@/lib/documents";
 import { PartyRole, Role } from "@/generated/prisma/enums";
@@ -64,15 +64,19 @@ export async function makeAgreement(
     counterpartySignerId: signers.find((s) => s.partyRole === PartyRole.COUNTERPARTY)!.id,
     companySignerId: signers.find((s) => s.partyRole === PartyRole.COMPANY)!.id,
     frozenSha256: "",
+    // The counterparty's signing-link token (shown once, at send).
+    token: "",
+    linkId: "",
   };
   if (stage === "draft") return ids;
 
-  ({ frozenSha256: ids.frozenSha256 } = await sendDocument(document.id, {
-    userId: company.paralegal.userId,
-  }));
+  const sent = await sendDocument(document.id, { userId: company.paralegal.userId });
+  ids.frozenSha256 = sent.frozenSha256;
+  ids.token = sent.signingToken;
+  ids.linkId = sent.signingLinkId;
   if (stage === "sent") return ids;
 
-  await signAsCounterparty(ids.counterpartySignerId, {
+  await signWithLink(ids.token, {
     signature: COUNTERPARTY_SIGNATURE,
     expectedSha256: ids.frozenSha256,
   });

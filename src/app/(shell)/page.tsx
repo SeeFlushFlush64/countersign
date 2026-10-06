@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/session";
 import { StatStrip } from "@/components/StatStrip";
 import { DocumentsTable, type DocumentRow } from "@/components/DocumentsTable";
 import { TEMPLATE_TYPE_LABELS } from "@/lib/labels";
@@ -8,6 +9,7 @@ import { DocumentStatus } from "@/generated/prisma/enums";
 export const dynamic = "force-dynamic";
 
 export default async function DocumentsPage() {
+  await requireUser();
   const documents = await prisma.document.findMany({
     orderBy: { createdAt: "desc" },
     include: { sender: true, signers: true },

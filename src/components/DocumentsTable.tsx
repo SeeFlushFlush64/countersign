@@ -22,6 +22,7 @@ const STATUS_ORDER: Record<DocumentStatus, number> = {
   SENT: 1,
   PARTIALLY_SIGNED: 2,
   FULLY_EXECUTED: 3,
+  VOIDED: 4,
 };
 
 type SortKey = "title" | "templateLabel" | "senderName" | "signed" | "status";

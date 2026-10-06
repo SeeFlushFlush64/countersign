@@ -41,10 +41,10 @@ describe("seed CLI", () => {
   it("seeds, exits on its own, and is idempotent on a second run", { timeout: 2 * EXIT_DEADLINE_MS }, async () => {
     const first = await runSeedCli();
     expect(first.code).toBe(0);
-    expect(first.output).toMatch(/Seed complete: 5 created, 0 already present, 0 mismatched/);
+    expect(first.output).toMatch(/Seed complete: 6 created, 0 already present, 0 mismatched/);
 
     const second = await runSeedCli();
     expect(second.code).toBe(0);
-    expect(second.output).toMatch(/Seed complete: 0 created, 5 already present, 0 mismatched/);
+    expect(second.output).toMatch(/Seed complete: 0 created, 6 already present, 0 mismatched/);
   });
 });

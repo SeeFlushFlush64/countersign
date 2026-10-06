@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/session";
 import { STATUS_EVENT_LABELS } from "@/lib/labels";
 import { formatDateTime } from "@/lib/format";
 import type { StatusEventType } from "@/generated/prisma/enums";
@@ -12,9 +13,12 @@ const DOT_CLASS: Record<StatusEventType, string> = {
   VIEWED: "bg-slate-dim",
   SIGNED: "bg-signal",
   FULLY_EXECUTED: "bg-live",
+  LINK_REISSUED: "bg-alert",
+  VOIDED: "bg-danger",
 };
 
 export default async function ActivityPage() {
+  await requireUser();
   const events = await prisma.statusEvent.findMany({
     orderBy: { timestamp: "desc" },
     include: { document: { select: { id: true, title: true } } },

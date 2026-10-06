@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { loadAgreementPdf } from "@/lib/documents";
 
-// Serves the executed PDF if it is READY, otherwise the frozen copy, otherwise
-// the draft preview. (Access control for this route is Phase C.)
+// Company access to an agreement's PDF: executed if READY, otherwise the
+// frozen copy, otherwise the draft preview. Requires a signed-in company
+// user, checked here rather than left to the proxy. Counterparties use their
+// link-scoped route (/s/[token]/document) instead.
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const session = await auth();
+  const user = session?.user?.id
+    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true } })
+    : null;
+  if (!user) {
+    return NextResponse.json({ error: "Sign in to view this agreement." }, { status: 401 });
+  }
+
   const { id } = await params;
   const result = await loadAgreementPdf(id);
 
@@ -24,7 +36,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="${result.title.replace(/[^a-z0-9-_ ]/gi, "")}.pdf"`,
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, no-store",
     },
   });
 }

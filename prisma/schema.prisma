@@ -38,14 +38,18 @@ enum TemplateType {
 //   SENT             — awaiting the counterparty (frozen PDF + hash exist)
 //   PARTIALLY_SIGNED — awaiting the company countersignature
 //   FULLY_EXECUTED   — executed (terminal)
+//   VOIDED           — voided by the company before execution (terminal)
 // The database enforces that the status agrees with the signing timestamps
-// and that the countersignature never precedes the counterparty's signature
-// (CHECK constraints in the 20261006120000_signing_core migration).
+// and void metadata, that the countersignature never precedes the
+// counterparty's signature, and that terminal statuses never change (CHECK
+// constraints and a trigger in the signing_core and signing_links
+// migrations).
 enum DocumentStatus {
   DRAFT
   SENT
   PARTIALLY_SIGNED
   FULLY_EXECUTED
+  VOIDED
 }
 
 enum ArtifactKind {
@@ -70,6 +74,21 @@ enum StatusEventType {
   VIEWED
   SIGNED
   FULLY_EXECUTED
+  LINK_REISSUED
+  VOIDED
+}
+
+// Who performed an audited action. Events written before this existed have
+// no actor type (a NOT VALID CHECK requires it on every new row).
+enum ActorType {
+  USER              // an authenticated company user (actorUserId)
+  COUNTERPARTY_LINK // the holder of a signing link (signingLinkId)
+  SYSTEM            // Countersign itself, or the seed script
+}
+
+enum LinkRevocationReason {
+  SUPERSEDED // replaced by a newer link (reissue)
+  VOIDED     // the agreement was voided
 }
 
 model Sender {
@@ -94,8 +113,11 @@ model User {
   // Only signatories can be designated to countersign agreements.
   isSignatory  Boolean @default(false)
 
-  sender                Sender     @relation(fields: [senderId], references: [id])
-  countersignDocuments  Document[] @relation("DocumentCountersigner")
+  sender                Sender        @relation(fields: [senderId], references: [id])
+  countersignDocuments  Document[]    @relation("DocumentCountersigner")
+  voidedDocuments       Document[]    @relation("DocumentVoidedBy")
+  issuedSigningLinks    SigningLink[] @relation("SigningLinkIssuedBy")
+  auditEvents           StatusEvent[] @relation("StatusEventActorUser")
 }
 
 model Document {
@@ -122,15 +144,56 @@ model Document {
   // SHA-256 (hex) of the FROZEN artifact; a signature must name this hash.
   frozenSha256         String?
 
+  // Supporting metadata for status VOIDED (present exactly when voided):
+  // when, why and by whom. The signing timestamps keep what had happened
+  // before the void.
+  voidedAt   DateTime?
+  voidReason String?
+  voidedById String?
+
   sender        Sender             @relation(fields: [senderId], references: [id])
   countersigner User?              @relation("DocumentCountersigner", fields: [countersignerId], references: [id], onDelete: Restrict)
+  voidedBy      User?              @relation("DocumentVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
   signers       Signer[]
   statusEvents  StatusEvent[]
   artifacts     DocumentArtifact[]
+  signingLinks  SigningLink[]      @relation("SigningLinkDocument")
+  activeLink    SigningLink?       @relation("SigningLinkActive")
 
   @@index([senderId])
   @@index([status])
   @@index([countersignerId])
+}
+
+// A counterparty's single-agreement scoped, expiring signing link. Only the
+// SHA-256 of the random token is stored; the token itself is shown once, when
+// the link is issued. At most one link per agreement is active: an active
+// link carries activeDocumentId (unique), and revoking it clears that column,
+// which a CHECK constraint keeps consistent with revokedAt.
+model SigningLink {
+  id               String                @id @default(cuid())
+  documentId       String
+  signerId         String
+  tokenHash        String                @unique
+  issuedById       String
+  createdAt        DateTime
+  expiresAt        DateTime
+  firstViewedAt    DateTime?
+  usedAt           DateTime?
+  revokedAt        DateTime?
+  revokedReason    LinkRevocationReason?
+  activeDocumentId String?               @unique
+  replacedById     String?               @unique
+
+  document       Document      @relation("SigningLinkDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  activeDocument Document?     @relation("SigningLinkActive", fields: [activeDocumentId], references: [id], onDelete: Restrict)
+  signer         Signer        @relation(fields: [signerId], references: [id], onDelete: Restrict)
+  issuedBy       User          @relation("SigningLinkIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  replacedBy     SigningLink?  @relation("SigningLinkReplacement", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces       SigningLink?  @relation("SigningLinkReplacement")
+  auditEvents    StatusEvent[]
+
+  @@index([documentId])
 }
 
 // Immutable-once-READY PDF artifacts. FROZEN is written in the same
@@ -162,20 +225,32 @@ model Signer {
   signedAt       DateTime?
   signatureData  String?
 
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document     Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  signingLinks SigningLink[]
 
   @@unique([documentId, partyRole])
   @@index([documentId])
 }
 
+// Append-only audit log: a database trigger rejects UPDATE and DELETE.
+// `actor` is a display name; the trustworthy identity is actorType plus
+// actorUserId (company user) or signingLinkId (counterparty link holder).
 model StatusEvent {
-  id         String          @id @default(cuid())
-  documentId String
-  eventType  StatusEventType
-  actor      String
-  timestamp  DateTime        @default(now())
+  id            String          @id @default(cuid())
+  documentId    String
+  eventType     StatusEventType
+  actor         String
+  timestamp     DateTime        @default(now())
+  actorType     ActorType?
+  actorUserId   String?
+  signingLinkId String?
+  // Event details, e.g. a void reason, or a hashed IP and user agent for
+  // counterparty actions.
+  metadata      Json?
 
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document    Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actorUser   User?        @relation("StatusEventActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  signingLink SigningLink? @relation(fields: [signingLinkId], references: [id], onDelete: Restrict)
 
   @@index([documentId])
 }

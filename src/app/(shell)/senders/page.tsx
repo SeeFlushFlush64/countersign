@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/session";
 import { ROLE_LABELS } from "@/lib/labels";
 import { DocumentStatus } from "@/generated/prisma/enums";
 
@@ -17,9 +18,11 @@ const STATUS_BREAKDOWN: { status: DocumentStatus; label: string; dot: string }[]
     label: "Executed",
     dot: "bg-live",
   },
+  { status: DocumentStatus.VOIDED, label: "Voided", dot: "bg-danger" },
 ];
 
 export default async function SendersPage() {
+  await requireUser();
   const senders = await prisma.sender.findMany({
     orderBy: { name: "asc" },
     include: { documents: { select: { status: true } } },

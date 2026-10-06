@@ -6,10 +6,11 @@ import { authConfig } from "./auth.config";
 export default NextAuth(authConfig).auth;
 
 export const config = {
-  // Protects everything except: the public signing room, the PDF endpoint
-  // it embeds (also used internally, so it can't require auth), the login
-  // page itself, NextAuth's own routes, and static assets.
+  // Protects everything except: the counterparty's signing room and its
+  // link-scoped PDF (/s/<token>...), the login page, NextAuth's own routes,
+  // and static assets. Internal pages and the company PDF route also verify
+  // the session themselves, so loosening this matcher cannot expose them.
   matcher: [
-    "/((?!api/auth|api/documents|sign|login|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth|s/|login|_next/static|_next/image|favicon.ico).*)",
   ],
 };

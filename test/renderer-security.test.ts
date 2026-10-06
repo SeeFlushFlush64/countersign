@@ -29,6 +29,11 @@ beforeEach(() => {
   hits.length = 0;
 });
 
+// Short enough to pass the input length limits (title 200, name 120), so it
+// reaches the renderer through the real lifecycle.
+const compactPayload = () =>
+  `Evil <img src="${base}/img"><script>new Image().src="${base}/js"</script>`;
+
 const payload = () =>
   `Evil Co <img src="${base}/img"><script>new Image().src="${base}/js"</script>` +
   `<iframe src="${base}/frame"></iframe><meta http-equiv="refresh" content="0;url=${base}/meta">`;
@@ -96,8 +101,8 @@ describe("end to end through the lifecycle", () => {
       data: { name: payload() },
     });
     const a = await makeAgreement(company, "executed", {
-      title: payload(),
-      counterpartyName: payload(),
+      title: compactPayload(),
+      counterpartyName: compactPayload(),
     });
 
     expect(hits).toEqual([]);

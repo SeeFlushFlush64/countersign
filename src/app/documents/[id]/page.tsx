@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/session";
 import { StatusStrip } from "@/components/StatusStrip";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Timeline } from "@/components/Timeline";
@@ -16,8 +16,9 @@ import {
   DocumentStatus,
   PartyRole,
 } from "@/generated/prisma/enums";
-import { sendDocumentAction } from "./actions";
-import { SendForm } from "./SendForm";
+import { reissueLinkAction, sendDocumentAction, voidDocumentAction } from "./actions";
+import { SigningLinkPanel } from "./SigningLinkPanel";
+import { VoidForm } from "./VoidForm";
 import { LivePoll } from "./LivePoll";
 
 export default async function DocumentPage({
@@ -26,7 +27,7 @@ export default async function DocumentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
+  const { user } = await requireUser();
 
   const document = await prisma.document.findUnique({
     where: { id },
@@ -34,6 +35,10 @@ export default async function DocumentPage({
       sender: true,
       signers: true,
       countersigner: { include: { sender: true } },
+      voidedBy: { include: { sender: true } },
+      activeLink: {
+        select: { id: true, createdAt: true, expiresAt: true, firstViewedAt: true, usedAt: true },
+      },
       artifacts: { select: { kind: true, status: true } },
       statusEvents: { orderBy: { timestamp: "asc" } },
     },
@@ -47,14 +52,23 @@ export default async function DocumentPage({
   const signedCount = document.signers.filter((s) => s.signedAt).length;
   const counterpartySigned = Boolean(counterparty?.signedAt);
   const boundSend = sendDocumentAction.bind(null, document.id);
-  const viewerIsCountersigner =
-    Boolean(session?.user?.id) && session?.user?.id === document.countersignerId;
+  // Reissue names the link it replaces, so a double-click or a concurrent
+  // reissue cannot create a second new link.
+  const boundReissue = reissueLinkAction.bind(null, document.id, document.activeLink?.id ?? null);
+  const boundVoid = voidDocumentAction.bind(null, document.id);
+  const viewerIsCountersigner = user.id === document.countersignerId;
+  const viewerCanManage =
+    user.senderId === document.senderId || user.id === document.countersignerId;
+  const isVoided = document.status === DocumentStatus.VOIDED;
+  const link = document.activeLink;
+  const linkExpired = Boolean(link && link.expiresAt <= new Date());
   const executedArtifact = document.artifacts.find(
     (a) => a.kind === ArtifactKind.EXECUTED,
   );
   const shouldPoll =
-    document.status === DocumentStatus.SENT ||
-    document.status === DocumentStatus.PARTIALLY_SIGNED;
+    !isVoided &&
+    (document.status === DocumentStatus.SENT ||
+      document.status === DocumentStatus.PARTIALLY_SIGNED);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-16">
@@ -81,6 +95,13 @@ export default async function DocumentPage({
         </div>
         <StatusBadge status={document.status} />
       </div>
+
+      {isVoided && (
+        <div className="mt-4 rounded-lg border border-danger/40 bg-panel p-4 text-sm text-slate">
+          Voided {formatDateTime(document.voidedAt!)} by{" "}
+          {document.voidedBy?.sender.name ?? "a company user"}: {document.voidReason}
+        </div>
+      )}
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_360px]">
         <div className="flex flex-col gap-4">
@@ -179,25 +200,41 @@ export default async function DocumentPage({
                         countersignature
                       </span>
                     )
+                  ) : isVoided ? (
+                    <span className="label-strip text-slate-dim">Voided</span>
                   ) : (
-                    <Link
-                      href={`/sign/${signer.id}`}
-                      className="label-strip text-signal hover:underline"
-                    >
-                      Sign link &rarr;
-                    </Link>
+                    <span className="label-strip text-right text-slate-dim">
+                      {!link
+                        ? "No active link"
+                        : linkExpired
+                          ? "Link expired"
+                          : link.firstViewedAt
+                            ? `Viewed ${formatDateTime(link.firstViewedAt)}`
+                            : "Link not opened yet"}
+                      {link && !linkExpired && (
+                        <>
+                          <br />
+                          Expires {formatDateTime(link.expiresAt)}
+                        </>
+                      )}
+                    </span>
                   )}
                 </li>
               ))}
             </ul>
           </section>
 
-          {document.status === DocumentStatus.DRAFT && (
-            <SendForm
-              action={boundSend}
-              note={`Freezes the PDF and its SHA-256, then simulates emailing ${counterparty?.name} — no real email is sent in this demo.`}
-            />
-          )}
+          {!isVoided &&
+            viewerCanManage &&
+            (document.status === DocumentStatus.DRAFT ||
+              document.status === DocumentStatus.SENT) && (
+              <SigningLinkPanel
+                mode={document.status === DocumentStatus.DRAFT ? "send" : "reissue"}
+                sendAction={boundSend}
+                reissueAction={boundReissue}
+                counterpartyName={counterparty?.name ?? "the counterparty"}
+              />
+            )}
 
           {executedArtifact && executedArtifact.status !== ArtifactStatus.READY && (
             <p className="text-xs text-alert">
@@ -208,6 +245,14 @@ export default async function DocumentPage({
               .
             </p>
           )}
+
+          {!isVoided &&
+            viewerCanManage &&
+            document.status !== DocumentStatus.FULLY_EXECUTED && (
+              <section className="rounded-lg border border-panel-border bg-panel p-5">
+                <VoidForm action={boundVoid} />
+              </section>
+            )}
 
           <section className="rounded-lg border border-panel-border bg-panel p-5">
             <h2 className="label-strip mb-4 text-slate">Activity</h2>

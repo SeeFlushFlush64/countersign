@@ -4,7 +4,7 @@ import {
   countersign,
   ORDER_VIOLATION_MESSAGE,
   sendDocument,
-  signAsCounterparty,
+  signWithLink,
 } from "@/lib/documents";
 import { ArtifactKind, DocumentStatus } from "@/generated/prisma/enums";
 import { expectPrivateEmptyDatabase } from "./harness/private-database";
@@ -36,7 +36,7 @@ describe("exactly one winner", () => {
     const a = await makeAgreement(company, "sent");
     const outcome = await race(
       Array.from({ length: ATTEMPTS }, () => () =>
-        signAsCounterparty(a.counterpartySignerId, {
+        signWithLink(a.token, {
           signature: COUNTERPARTY_SIGNATURE,
           expectedSha256: a.frozenSha256,
         }),
@@ -96,7 +96,7 @@ describe("ordering under a race", () => {
     for (let round = 0; round < 5; round++) {
       const a = await makeAgreement(company, "sent");
       const [counterpartyResult, companyResult] = await Promise.allSettled([
-        signAsCounterparty(a.counterpartySignerId, {
+        signWithLink(a.token, {
           signature: COUNTERPARTY_SIGNATURE,
           expectedSha256: a.frozenSha256,
         }),

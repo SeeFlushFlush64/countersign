@@ -1,7 +1,7 @@
 import http from "node:http";
 import { crc32, deflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { signAsCounterparty } from "@/lib/documents";
+import { signWithLink } from "@/lib/documents";
 import {
   InvalidSignatureError,
   SIGNATURE_LIMITS,
@@ -134,7 +134,7 @@ describe("signing with an unsafe signature", () => {
     const { port } = server.address() as { port: number };
 
     await expect(
-      signAsCounterparty(a.counterpartySignerId, {
+      signWithLink(a.token, {
         signature: `http://127.0.0.1:${port}/ssrf-from-signature.png`,
         expectedSha256: a.frozenSha256,
       }),
