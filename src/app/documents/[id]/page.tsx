@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusStrip } from "@/components/StatusStrip";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -9,8 +10,14 @@ import {
   TEMPLATE_TYPE_LABELS,
 } from "@/lib/labels";
 import { formatDateTime } from "@/lib/format";
-import { DocumentStatus, PartyRole } from "@/generated/prisma/enums";
+import {
+  ArtifactKind,
+  ArtifactStatus,
+  DocumentStatus,
+  PartyRole,
+} from "@/generated/prisma/enums";
 import { sendDocumentAction } from "./actions";
+import { SendForm } from "./SendForm";
 import { LivePoll } from "./LivePoll";
 
 export default async function DocumentPage({
@@ -19,25 +26,32 @@ export default async function DocumentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await auth();
 
   const document = await prisma.document.findUnique({
     where: { id },
     include: {
       sender: true,
       signers: true,
+      countersigner: { include: { sender: true } },
+      artifacts: { select: { kind: true, status: true } },
       statusEvents: { orderBy: { timestamp: "asc" } },
     },
   });
 
   if (!document) notFound();
 
-  const company = document.signers.find((s) => s.partyRole === PartyRole.COMPANY);
   const counterparty = document.signers.find(
     (s) => s.partyRole === PartyRole.COUNTERPARTY,
   );
   const signedCount = document.signers.filter((s) => s.signedAt).length;
   const counterpartySigned = Boolean(counterparty?.signedAt);
   const boundSend = sendDocumentAction.bind(null, document.id);
+  const viewerIsCountersigner =
+    Boolean(session?.user?.id) && session?.user?.id === document.countersignerId;
+  const executedArtifact = document.artifacts.find(
+    (a) => a.kind === ArtifactKind.EXECUTED,
+  );
   const shouldPoll =
     document.status === DocumentStatus.SENT ||
     document.status === DocumentStatus.PARTIALLY_SIGNED;
@@ -104,10 +118,16 @@ export default async function DocumentPage({
             <dl className="flex flex-col gap-3 text-sm">
               <div>
                 <dt className="text-slate-dim">
-                  Company &middot; {ROLE_LABELS[document.sender.role]}
+                  Sent by &middot; {ROLE_LABELS[document.sender.role]}
                 </dt>
                 <dd className="text-paper">{document.sender.name}</dd>
                 <dd className="text-slate">{document.sender.email}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-dim">Company countersigner</dt>
+                <dd className="text-paper">
+                  {document.countersigner?.sender.name ?? "Not assigned"}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-dim">Counterparty</dt>
@@ -144,6 +164,21 @@ export default async function DocumentPage({
                       <br />
                       signature
                     </span>
+                  ) : signer.partyRole === PartyRole.COMPANY ? (
+                    viewerIsCountersigner ? (
+                      <Link
+                        href={`/documents/${document.id}/countersign`}
+                        className="label-strip text-signal hover:underline"
+                      >
+                        Countersign &rarr;
+                      </Link>
+                    ) : (
+                      <span className="label-strip text-right text-slate-dim">
+                        Awaiting
+                        <br />
+                        countersignature
+                      </span>
+                    )
                   ) : (
                     <Link
                       href={`/sign/${signer.id}`}
@@ -158,18 +193,20 @@ export default async function DocumentPage({
           </section>
 
           {document.status === DocumentStatus.DRAFT && (
-            <form action={boundSend}>
-              <button
-                type="submit"
-                className="label-strip w-full rounded-md border border-signal bg-signal/10 px-4 py-3 text-paper transition-colors hover:bg-signal/20"
-              >
-                Send for signature
-              </button>
-              <p className="mt-2 text-xs text-slate-dim">
-                Simulates emailing {company?.name} and {counterparty?.name} —
-                no real email is sent in this demo.
-              </p>
-            </form>
+            <SendForm
+              action={boundSend}
+              note={`Freezes the PDF and its SHA-256, then simulates emailing ${counterparty?.name} — no real email is sent in this demo.`}
+            />
+          )}
+
+          {executedArtifact && executedArtifact.status !== ArtifactStatus.READY && (
+            <p className="text-xs text-alert">
+              Executed. The executed PDF is{" "}
+              {executedArtifact.status === ArtifactStatus.FAILED
+                ? "not ready yet (generation failed and will be retried when the PDF is opened)"
+                : "being generated"}
+              .
+            </p>
           )}
 
           <section className="rounded-lg border border-panel-border bg-panel p-5">

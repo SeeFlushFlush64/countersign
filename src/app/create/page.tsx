@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { CreateForm } from "./CreateForm";
 import { StatusStrip } from "@/components/StatusStrip";
 import { ROLE_LABELS } from "@/lib/labels";
@@ -11,6 +12,17 @@ export const dynamic = "force-dynamic";
 export default async function CreatePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+
+  const signatories = await prisma.user.findMany({
+    where: { isSignatory: true },
+    include: { sender: true },
+    orderBy: { email: "asc" },
+  });
+  const countersigners = signatories.map((user) => ({
+    id: user.id,
+    name: user.sender.name,
+    role: ROLE_LABELS[user.sender.role],
+  }));
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-16">
@@ -37,6 +49,12 @@ export default async function CreatePage() {
         <CreateForm
           senderName={session.user.senderName}
           senderRole={ROLE_LABELS[session.user.senderRole as Role]}
+          countersigners={countersigners}
+          defaultCountersignerId={
+            countersigners.some((c) => c.id === session.user.id)
+              ? session.user.id
+              : countersigners[0]?.id
+          }
         />
       </div>
     </main>

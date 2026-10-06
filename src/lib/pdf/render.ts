@@ -1,4 +1,5 @@
-import type { Browser } from "puppeteer-core";
+import type { Browser, HTTPRequest } from "puppeteer-core";
+import { RENDER_SENTINEL_ID } from "./template";
 
 // Local dev (incl. Windows) uses the full `puppeteer` package, which ships
 // its own Chromium binary. Vercel's serverless functions use `puppeteer-core`
@@ -8,6 +9,10 @@ import type { Browser } from "puppeteer-core";
 const isServerless = Boolean(
   process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
 );
+
+const RENDER_TIMEOUT_MS = 20_000;
+
+export class RenderIntegrityError extends Error {}
 
 async function launchBrowser(): Promise<Browser> {
   if (isServerless) {
@@ -24,14 +29,80 @@ async function launchBrowser(): Promise<Browser> {
   return puppeteer.launch({ headless: true }) as unknown as Promise<Browser>;
 }
 
+// One browser per process, reused across renders (launching Chromium costs
+// seconds); every render still gets its own fresh, isolated browser context.
+// A crashed or closed browser is relaunched on the next render.
+let browserPromise: Promise<Browser> | null = null;
+
+function getBrowser(): Promise<Browser> {
+  if (!browserPromise) {
+    const launching = launchBrowser();
+    browserPromise = launching;
+    launching.then(
+      (browser) =>
+        browser.on("disconnected", () => {
+          if (browserPromise === launching) browserPromise = null;
+        }),
+      () => {
+        if (browserPromise === launching) browserPromise = null;
+      },
+    );
+  }
+  return browserPromise;
+}
+
+export async function closeRenderer(): Promise<void> {
+  const pending = browserPromise;
+  browserPromise = null;
+  if (pending) await (await pending.catch(() => null))?.close();
+}
+
+// The page may load nothing from anywhere: the HTML is set directly and
+// every request the document would make (images, stylesheets, fonts,
+// frames, navigations, file: URLs) is aborted. Combined with JavaScript
+// being disabled, untrusted text that slipped into the HTML can neither
+// execute nor reach the network or the filesystem.
+function allowOnlyTheDocumentItself(request: HTTPRequest) {
+  const url = request.url();
+  if (url === "about:blank" || url.startsWith("data:")) {
+    void request.continue();
+  } else {
+    void request.abort("blockedbyclient");
+  }
+}
+
 export async function renderHtmlToPdf(
   html: string,
   footerHtml: string,
 ): Promise<Buffer> {
-  const browser = await launchBrowser();
+  const browser = await getBrowser();
+  const context = await browser.createBrowserContext();
   try {
-    const page = await browser.newPage();
+    const page = await context.newPage();
+    page.setDefaultTimeout(RENDER_TIMEOUT_MS);
+    await page.setJavaScriptEnabled(false);
+    await page.setRequestInterception(true);
+    page.on("request", allowOnlyTheDocumentItself);
+
     await page.setContent(html, { waitUntil: "load" });
+
+    // A blocked navigation (e.g. a meta refresh) replaces the document with
+    // an error page and would otherwise print a blank PDF without failing.
+    // Checked before and after printing, since a navigation can land while
+    // the PDF is being generated.
+    let navigated = false;
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) navigated = true;
+    });
+    const assertIntact = async () => {
+      if (navigated || page.url() !== "about:blank" || !(await page.$(`#${RENDER_SENTINEL_ID}`))) {
+        throw new RenderIntegrityError(
+          "The agreement did not render as expected; refusing to produce a PDF.",
+        );
+      }
+    };
+
+    await assertIntact();
     const pdf = await page.pdf({
       format: "letter",
       printBackground: true,
@@ -40,8 +111,9 @@ export async function renderHtmlToPdf(
       headerTemplate: "<span></span>",
       footerTemplate: footerHtml,
     });
+    await assertIntact();
     return Buffer.from(pdf);
   } finally {
-    await browser.close();
+    await context.close().catch(() => {});
   }
 }

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { redirect } from "next/navigation";
-import { createDocument } from "@/lib/documents";
+import { createDocument, DocumentFlowError } from "@/lib/documents";
 import { TemplateType } from "@/generated/prisma/enums";
 import type { TemplateType as TemplateTypeT } from "@/generated/prisma/enums";
 import { TEMPLATE_TYPE_LABELS } from "@/lib/labels";
@@ -18,6 +18,7 @@ const schema = z.object({
   title: z.string().optional(),
   counterpartyName: z.string().min(1, "Counterparty name is required."),
   counterpartyEmail: z.string().email("Enter a valid email address."),
+  countersignerId: z.string().min(1, "Choose who will countersign."),
 });
 
 export type CreateDocumentState = { error: string | null };
@@ -38,6 +39,7 @@ export async function createDocumentAction(
     title: formData.get("title") || undefined,
     counterpartyName: formData.get("counterpartyName"),
     counterpartyEmail: formData.get("counterpartyEmail"),
+    countersignerId: formData.get("countersignerId"),
   });
 
   if (!parsed.success) {
@@ -49,13 +51,21 @@ export async function createDocumentAction(
     data.title?.trim() ||
     `${TEMPLATE_TYPE_LABELS[data.templateType]} — ${data.counterpartyName}`;
 
-  const document = await createDocument({
-    senderId: session.user.senderId,
-    templateType: data.templateType,
-    title,
-    counterpartyName: data.counterpartyName,
-    counterpartyEmail: data.counterpartyEmail,
-  });
+  let document;
+  try {
+    document = await createDocument({
+      senderId: session.user.senderId,
+      // Validated server-side: createDocument refuses non-signatories.
+      countersignerId: data.countersignerId,
+      templateType: data.templateType,
+      title,
+      counterpartyName: data.counterpartyName,
+      counterpartyEmail: data.counterpartyEmail,
+    });
+  } catch (error) {
+    if (error instanceof DocumentFlowError) return { error: error.message };
+    throw error;
+  }
 
   redirect(`/documents/${document.id}`);
 }

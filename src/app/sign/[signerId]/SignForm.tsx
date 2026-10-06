@@ -2,14 +2,18 @@
 
 import { useRef, useState, useTransition } from "react";
 import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
-import { signAction } from "./actions";
 
+// Shared by the counterparty signing room and the company countersign page.
+// `action` is a server action already bound to the agreement and the frozen
+// SHA-256 the signer is looking at; it only receives the drawn signature.
 export function SignForm({
-  signerId,
   signerName,
+  action,
+  submitLabel = "Sign & submit",
 }: {
-  signerId: string;
   signerName: string;
+  action: (signature: string) => Promise<{ error: string | null } | void>;
+  submitLabel?: string;
 }) {
   const padRef = useRef<SignaturePadHandle>(null);
   const [empty, setEmpty] = useState(true);
@@ -25,7 +29,7 @@ export function SignForm({
     }
     const dataUrl = padRef.current.toDataURL();
     startTransition(async () => {
-      const result = await signAction(signerId, dataUrl);
+      const result = await action(dataUrl);
       if (result?.error) setError(result.error);
     });
   };
@@ -45,7 +49,7 @@ export function SignForm({
           disabled={pending || empty}
           className="label-strip rounded-md border border-signal bg-signal/10 px-5 py-2.5 text-paper transition-colors hover:bg-signal/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Submitting…" : "Sign & submit"}
+          {pending ? "Submitting…" : submitLabel}
         </button>
         <button
           type="button"

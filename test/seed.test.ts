@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { DocumentStatus, PartyRole } from "@/generated/prisma/enums";
+import { ArtifactKind, DocumentStatus, PartyRole } from "@/generated/prisma/enums";
 import {
   DEMO_LOGIN_EMAIL,
   DEMO_LOGIN_PASSWORD,
+  DEMO_USERS,
   SCHEDULE,
   SEED_DOCUMENTS,
   SEED_SENDERS,
@@ -64,7 +65,13 @@ describe("seed", () => {
 
     const afterFirst = await snapshot();
     expect(afterFirst.senders).toHaveLength(SEED_SENDERS.length);
-    expect(afterFirst.users).toHaveLength(1);
+    expect(afterFirst.users).toHaveLength(DEMO_USERS.length);
+    for (const demo of DEMO_USERS) {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: demo.email } });
+      expect(user.isSignatory).toBe(demo.isSignatory);
+      expect(await bcrypt.compare(DEMO_LOGIN_PASSWORD, user.passwordHash)).toBe(true);
+    }
+    const signatory = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_LOGIN_EMAIL } });
 
     // Every row sits exactly where the schedule puts it.
     for (const spec of SEED_DOCUMENTS) {
@@ -76,6 +83,22 @@ describe("seed", () => {
       const at = (hours: number) => new Date(createdAt.getTime() + hours * HOUR);
 
       expect(row.status).toBe(EXPECTED_STATUS[spec.stage]);
+      expect(row.countersignerId).toBe(signatory.id);
+      const artifacts = await prisma.documentArtifact.findMany({
+        where: { documentId: row.id },
+        select: { kind: true, status: true },
+        orderBy: { kind: "asc" },
+      });
+      expect(artifacts).toEqual(
+        spec.stage === "draft"
+          ? []
+          : spec.stage === "executed"
+            ? [
+                { kind: ArtifactKind.FROZEN, status: "READY" },
+                { kind: ArtifactKind.EXECUTED, status: "READY" },
+              ]
+            : [{ kind: ArtifactKind.FROZEN, status: "READY" }],
+      );
       expect(row.createdAt).toEqual(createdAt);
       expect(row.pdfData?.length ?? 0).toBeGreaterThan(0);
       expect(row.sentAt).toEqual(spec.stage === "draft" ? null : at(SCHEDULE.sent));
@@ -107,17 +130,17 @@ describe("seed", () => {
     // The second run changed nothing at all.
     expect(await snapshot()).toEqual(afterFirst);
 
-    const demoUser = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_LOGIN_EMAIL } });
-    expect(await bcrypt.compare(DEMO_LOGIN_PASSWORD, demoUser.passwordHash)).toBe(true);
   });
 
   it("reports a drifted document instead of skipping or rewriting it", async () => {
     // Runs after the first test in the same file database.
     const spec = SEED_DOCUMENTS.find((d) => d.stage === "sent")!;
     const row = await prisma.document.findFirstOrThrow({ where: { title: spec.title } });
+    // Drift that still satisfies the database constraints (a status change
+    // alone would be refused by Document_status_matches_timestamps).
     await prisma.document.update({
       where: { id: row.id },
-      data: { status: DocumentStatus.DRAFT },
+      data: { status: DocumentStatus.DRAFT, sentAt: null },
     });
     const before = await snapshot();
 
@@ -127,6 +150,20 @@ describe("seed", () => {
       { title: spec.title, expected: "sent", actual: "draft" },
     ]);
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("assigns a countersigner to an existing seeded agreement that lacks one", async () => {
+    const spec = SEED_DOCUMENTS.find((d) => d.stage === "draft")!;
+    const row = await prisma.document.findFirstOrThrow({ where: { title: spec.title } });
+    await prisma.document.update({ where: { id: row.id }, data: { countersignerId: null } });
+
+    const report = await seed({ anchor: ANCHOR, log: quiet });
+    expect(report.backfilled).toEqual([spec.title]);
+    expect(report.created).toHaveLength(0);
+    const signatory = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_LOGIN_EMAIL } });
+    expect(
+      (await prisma.document.findUniqueOrThrow({ where: { id: row.id } })).countersignerId,
+    ).toBe(signatory.id);
   });
 
   it("anchors the CLI default to the start of the current UTC hour", () => {

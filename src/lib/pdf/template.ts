@@ -2,6 +2,11 @@ import Handlebars from "handlebars";
 import { TEMPLATE_CONTENT } from "./content";
 import type { TemplateType } from "@/generated/prisma/enums";
 
+// Everything here except the template text itself is untrusted (names,
+// titles and emails are typed by users), so every merge field is
+// HTML-escaped. The agreement body carries no signatures: it is rendered once
+// and frozen at send, and signatures are stamped onto an execution page with
+// pdf-lib afterwards (src/lib/pdf/execution-page.ts).
 export type DocumentPdfData = {
   documentId: string;
   documentTitle: string;
@@ -11,13 +16,14 @@ export type DocumentPdfData = {
   companyAddress: string;
   counterpartyName: string;
   counterpartyEmail: string;
-  companySignerName: string;
-  companySignerRole: string;
-  companySignedAt: string | null;
-  companySignatureData: string | null;
-  counterpartySignedAt: string | null;
-  counterpartySignatureData: string | null;
+  countersignerName: string;
+  countersignerRole: string;
 };
+
+// The renderer refuses to produce a PDF unless this element is present in
+// the loaded page, so a page that navigated away (e.g. to an error page)
+// can never be frozen as the agreement.
+export const RENDER_SENTINEL_ID = "countersign-render-sentinel";
 
 const SHELL = `<!doctype html>
 <html>
@@ -71,33 +77,20 @@ const SHELL = `<!doctype html>
     display: inline;
   }
   .clause .body { display: inline; }
-  .signatures {
-    margin-top: 34pt;
-    display: flex;
-    justify-content: space-between;
-    gap: 36pt;
+  .execution {
+    margin-top: 28pt;
+    padding-top: 10pt;
+    border-top: 1pt solid #16181c;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 9pt;
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  .sig-block {
-    flex: 1;
-    min-width: 0;
-    font-family: Helvetica, Arial, sans-serif;
-    font-size: 9pt;
-  }
-  .sig-line {
-    border-top: 1pt solid #16181c;
-    margin-top: 34pt;
-    padding-top: 4pt;
-  }
-  .sig-image {
-    height: 30pt;
-    max-width: 100%;
-    width: auto;
-    display: block;
-    margin-bottom: 2pt;
-  }
-  .sig-caption { color: #555; margin-top: 2pt; }
+  .execution h2 { font-size: 10pt; margin: 0 0 6pt 0; }
+  .execution p { margin: 0 0 8pt 0; color: #333; }
+  .parties { display: flex; gap: 36pt; }
+  .party { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .party .role { color: #555; }
 </style>
 </head>
 <body>
@@ -117,53 +110,48 @@ const SHELL = `<!doctype html>
   </div>
   {{/each}}
 
-  <div class="signatures">
-    <div class="sig-block">
-      {{#if companySignatureData}}
-        <img class="sig-image" src="{{companySignatureData}}" />
-      {{/if}}
-      <div class="sig-line">
-        {{companySignerName}}<br />
-        {{companySignerRole}}, {{companyName}}
+  <div class="execution">
+    <h2>Execution</h2>
+    <p>
+      This Agreement is executed by electronic signature, the Counterparty
+      signing first and the Company countersigning second. The execution page
+      appended to this document records each signature, the time it was made,
+      and the SHA-256 fingerprint of this document as sent.
+    </p>
+    <div class="parties">
+      <div class="party">
+        {{countersignerName}}<br />
+        <span class="role">{{countersignerRole}}, {{companyName}}</span>
       </div>
-      <div class="sig-caption">
-        {{#if companySignedAt}}Signed {{companySignedAt}}{{else}}Awaiting signature{{/if}}
-      </div>
-    </div>
-    <div class="sig-block">
-      {{#if counterpartySignatureData}}
-        <img class="sig-image" src="{{counterpartySignatureData}}" />
-      {{/if}}
-      <div class="sig-line">
+      <div class="party">
         {{counterpartyName}}<br />
-        {{counterpartyEmail}}
-      </div>
-      <div class="sig-caption">
-        {{#if counterpartySignedAt}}Signed {{counterpartySignedAt}}{{else}}Awaiting signature{{/if}}
+        <span class="role">{{counterpartyEmail}}</span>
       </div>
     </div>
   </div>
 
+  <div id="${RENDER_SENTINEL_ID}"></div>
 </body>
 </html>`;
 
-const compiled = Handlebars.compile(SHELL, { noEscape: false });
+// Default Handlebars escaping applies to the merged values only; the
+// template text (with its HTML entities) is trusted, authored content.
+const compiled = Handlebars.compile(SHELL, { strict: true });
 
 export function renderDocumentHtml(data: DocumentPdfData): string {
   const content = TEMPLATE_CONTENT[data.templateType];
 
-  const recitalCompiled = Handlebars.compile(content.recital, {
-    noEscape: true,
-  })(data);
+  const recital = Handlebars.compile(content.recital, { strict: true })(data);
   const clauses = content.clauses.map((clause) => ({
     heading: clause.heading,
-    body: Handlebars.compile(clause.body, { noEscape: true })(data),
+    body: Handlebars.compile(clause.body, { strict: true })(data),
   }));
 
   return compiled({
     ...data,
     templateLabel: content.label,
-    recital: recitalCompiled,
+    // Already escaped above; inserted with triple braces in SHELL.
+    recital,
     clauses,
   });
 }
@@ -171,7 +159,9 @@ export function renderDocumentHtml(data: DocumentPdfData): string {
 export function renderFooterHtml(data: DocumentPdfData): string {
   // Puppeteer renders this as its own isolated document per page, styled
   // independently of the main page CSS — font sizes here are plain px.
+  const title = Handlebars.escapeExpression(data.documentTitle);
+  const ref = Handlebars.escapeExpression(data.documentId);
   return `<div style="font-family:Helvetica,Arial,sans-serif;font-size:7px;color:#888;width:100%;text-align:center;">
-    ${data.documentTitle} &middot; Ref ${data.documentId} &middot; Generated by Countersign (demo)
+    ${title} &middot; Ref ${ref} &middot; Generated by Countersign (demo)
   </div>`;
 }

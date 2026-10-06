@@ -7,6 +7,7 @@ import { TEMPLATE_TYPE_LABELS } from "@/lib/labels";
 import { DocumentStatus, PartyRole } from "@/generated/prisma/enums";
 import { formatDateTime } from "@/lib/format";
 import { SignForm } from "./SignForm";
+import { signAction } from "./actions";
 import { ViewTracker } from "./ViewTracker";
 
 export default async function SignPage({
@@ -26,16 +27,14 @@ export default async function SignPage({
   const document = signer.document;
   const isDraft = document.status === DocumentStatus.DRAFT;
 
+  const isCompanySigner = signer.partyRole === PartyRole.COMPANY;
   const otherSigner = document.signers.find((s) => s.id !== signer.id);
-  const waitingOnOtherSigner =
-    !isDraft &&
-    !signer.signedAt &&
-    signer.partyRole === PartyRole.COMPANY &&
-    !otherSigner?.signedAt;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-16">
-      {!signer.signedAt && !isDraft && <ViewTracker signerId={signerId} />}
+      {!signer.signedAt && !isDraft && !isCompanySigner && (
+        <ViewTracker signerId={signerId} />
+      )}
       <StatusStrip
         segments={[
           <Link key="home" href="/" className="hover:text-signal">
@@ -74,22 +73,21 @@ export default async function SignPage({
       </div>
 
       <div className="mt-8 rounded-lg border border-panel-border bg-panel p-6">
-        {isDraft ? (
+        {isCompanySigner ? (
+          <div>
+            <p className="label-strip text-alert">
+              Company countersignatures happen inside Countersign
+            </p>
+            <p className="mt-2 text-sm text-slate">
+              {signer.name} countersigns from the agreement page after signing
+              in, and only once {otherSigner?.name} has signed. This link
+              cannot be used to sign.
+            </p>
+          </div>
+        ) : isDraft ? (
           <p className="label-strip text-slate">
             This document has not been sent for signature yet.
           </p>
-        ) : waitingOnOtherSigner ? (
-          <div>
-            <p className="label-strip text-alert">
-              Waiting on {otherSigner?.name} to sign first
-            </p>
-            <p className="mt-2 text-sm text-slate">
-              Countersign requires the counterparty&rsquo;s signature before
-              {" "}{document.sender.name} can countersign. You&rsquo;ll be able
-              to sign here once {otherSigner?.name} has completed their
-              signature.
-            </p>
-          </div>
         ) : signer.signedAt ? (
           <div>
             <p className="label-strip text-live">
@@ -110,7 +108,15 @@ export default async function SignPage({
             )}
           </div>
         ) : (
-          <SignForm signerId={signer.id} signerName={signer.name} />
+          <div className="flex flex-col gap-4">
+            <p className="font-mono text-xs break-all text-slate-dim">
+              You are signing the document with SHA-256 {document.frozenSha256}
+            </p>
+            <SignForm
+              signerName={signer.name}
+              action={signAction.bind(null, signer.id, document.frozenSha256 ?? "")}
+            />
+          </div>
         )}
       </div>
     </main>

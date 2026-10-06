@@ -3,11 +3,13 @@ import { prisma } from "../src/lib/prisma";
 import { DocumentStatus, PartyRole, Role } from "../src/generated/prisma/enums";
 import type { TemplateType } from "../src/generated/prisma/enums";
 import {
+  countersign,
   createDocument,
-  sendDocument,
   recordView,
-  signAsSigner,
+  sendDocument,
+  signAsCounterparty,
 } from "../src/lib/documents";
+import { signatureDataUrl } from "./png-signature";
 
 // Deterministic, re-runnable demo data.
 //
@@ -23,7 +25,15 @@ import {
 // reported as a mismatch rather than silently skipped or "repaired".
 
 export const DEMO_LOGIN_EMAIL = "demo@countersign.dev";
+export const DEMO_PARALEGAL_EMAIL = "paralegal@countersign.dev";
 export const DEMO_LOGIN_PASSWORD = "countersign-demo";
+
+// Two published demo accounts: a signatory who countersigns every seeded
+// agreement, and a non-signatory who is refused at countersignature.
+export const DEMO_USERS = [
+  { email: DEMO_LOGIN_EMAIL, senderEmail: "dana.whitfield@northlightmedia.com", isSignatory: true },
+  { email: DEMO_PARALEGAL_EMAIL, senderEmail: "tomas.reyes@northlightmedia.com", isSignatory: false },
+] as const;
 
 const HOUR = 60 * 60 * 1000;
 
@@ -122,6 +132,9 @@ export type SeedReport = {
   skipped: string[];
   mismatched: { title: string; expected: SeedStage; actual: SeedStage }[];
   duplicated: string[];
+  // Existing seeded agreements given a countersigner (the column was added
+  // after they were created).
+  backfilled: string[];
 };
 
 // The CLI's default anchor: the start of the current UTC hour, so a re-run
@@ -136,16 +149,6 @@ export function documentCreatedAt(spec: SeedDocument, anchor: Date): Date {
   return new Date(anchor.getTime() - spec.createdHoursAgo * HOUR);
 }
 
-function scriptSignature(name: string): string {
-  const fontSize = 44;
-  const width = Math.max(260, name.length * fontSize * 0.62);
-  const height = 110;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <text x="8" y="${height - 40}" font-family="Segoe Script, Brush Script MT, cursive" font-size="${fontSize}" fill="#0c1116">${name}</text>
-  </svg>`;
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
-}
-
 async function signerFor(documentId: string, partyRole: PartyRole) {
   return prisma.signer.findFirstOrThrow({ where: { documentId, partyRole } });
 }
@@ -153,13 +156,14 @@ async function signerFor(documentId: string, partyRole: PartyRole) {
 async function seedDocument(
   spec: SeedDocument,
   senderId: string,
+  signatoryUserId: string,
   anchor: Date,
   report: SeedReport,
   log: (line: string) => void,
 ) {
   const existing = await prisma.document.findMany({
     where: { title: spec.title, senderId },
-    select: { status: true },
+    select: { id: true, status: true, countersignerId: true },
     orderBy: { createdAt: "asc" },
   });
 
@@ -167,6 +171,14 @@ async function seedDocument(
     if (existing.length > 1) {
       report.duplicated.push(spec.title);
       log(`  ! ${spec.title}: ${existing.length} copies exist (left untouched)`);
+    }
+    if (!existing[0].countersignerId) {
+      await prisma.document.update({
+        where: { id: existing[0].id },
+        data: { countersignerId: signatoryUserId },
+      });
+      report.backfilled.push(spec.title);
+      log(`  ~ ${spec.title}: countersigner assigned`);
     }
     const actual = STAGE_FOR_STATUS[existing[0].status];
     if (actual !== spec.stage) {
@@ -185,6 +197,7 @@ async function seedDocument(
   const document = await createDocument(
     {
       senderId,
+      countersignerId: signatoryUserId,
       templateType: spec.templateType,
       title: spec.title,
       counterpartyName: spec.counterpartyName,
@@ -193,25 +206,37 @@ async function seedDocument(
     { now: createdAt },
   );
 
+  const signatory = { userId: signatoryUserId };
+  let frozenSha256 = "";
   if (spec.stage !== "draft") {
-    await sendDocument(document.id, { now: at(SCHEDULE.sent) });
+    ({ frozenSha256 } = await sendDocument(document.id, signatory, {
+      now: at(SCHEDULE.sent),
+    }));
   }
 
   if (spec.stage === "counterpartySigned" || spec.stage === "executed") {
     // Sequential signing: the counterparty views and signs first…
     const counterparty = await signerFor(document.id, PartyRole.COUNTERPARTY);
     await recordView(counterparty.id, { now: at(SCHEDULE.counterpartyViewed) });
-    await signAsSigner(counterparty.id, scriptSignature(counterparty.name), {
-      now: at(SCHEDULE.counterpartySigned),
-    });
+    await signAsCounterparty(
+      counterparty.id,
+      { signature: signatureDataUrl(counterparty.name), expectedSha256: frozenSha256 },
+      { now: at(SCHEDULE.counterpartySigned) },
+    );
   }
 
   if (spec.stage === "executed") {
-    // …and only then can the company countersign.
+    // …and only then can the designated company signatory countersign.
     const company = await signerFor(document.id, PartyRole.COMPANY);
-    await signAsSigner(company.id, scriptSignature(company.name), {
-      now: at(SCHEDULE.companySigned),
-    });
+    const artifact = await countersign(
+      document.id,
+      signatory,
+      { signature: signatureDataUrl(company.name), expectedSha256: frozenSha256 },
+      { now: at(SCHEDULE.companySigned) },
+    );
+    if (artifact.status !== "READY") {
+      throw new Error(`Executed PDF for "${spec.title}" is ${artifact.status}.`);
+    }
   }
 
   report.created.push(spec.title);
@@ -235,7 +260,13 @@ export async function seed({
     }
   }
 
-  const report: SeedReport = { created: [], skipped: [], mismatched: [], duplicated: [] };
+  const report: SeedReport = {
+    created: [],
+    skipped: [],
+    mismatched: [],
+    duplicated: [],
+    backfilled: [],
+  };
 
   log("Seeding senders…");
   const senderIds = new Map<string, string>();
@@ -248,32 +279,48 @@ export async function seed({
     senderIds.set(sender.email, row.id);
   }
 
-  log("Seeding demo login…");
-  const demoSenderId = senderIds.get(SEED_SENDERS[0].email)!;
-  const existingUser = await prisma.user.findUnique({
-    where: { email: DEMO_LOGIN_EMAIL },
-  });
-  if (!existingUser) {
-    await prisma.user.create({
-      data: {
-        email: DEMO_LOGIN_EMAIL,
-        passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10),
-        senderId: demoSenderId,
-      },
-    });
-  } else if (
-    !(await bcrypt.compare(DEMO_LOGIN_PASSWORD, existingUser.passwordHash))
-  ) {
-    // Keep the published demo credentials working.
-    await prisma.user.update({
-      where: { id: existingUser.id },
-      data: { passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10) },
-    });
+  log("Seeding demo logins…");
+  const userIds = new Map<string, string>();
+  for (const demo of DEMO_USERS) {
+    const senderId = senderIds.get(demo.senderEmail)!;
+    const existingUser = await prisma.user.findUnique({ where: { email: demo.email } });
+    if (!existingUser) {
+      const created = await prisma.user.create({
+        data: {
+          email: demo.email,
+          passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10),
+          senderId,
+          isSignatory: demo.isSignatory,
+        },
+      });
+      userIds.set(demo.email, created.id);
+      continue;
+    }
+    // Keep the published demo credentials and roles as documented.
+    const passwordOk = await bcrypt.compare(DEMO_LOGIN_PASSWORD, existingUser.passwordHash);
+    if (!passwordOk || existingUser.isSignatory !== demo.isSignatory) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          isSignatory: demo.isSignatory,
+          ...(passwordOk ? {} : { passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10) }),
+        },
+      });
+    }
+    userIds.set(demo.email, existingUser.id);
   }
+  const signatoryUserId = userIds.get(DEMO_LOGIN_EMAIL)!;
 
   log("Seeding documents…");
   for (const spec of SEED_DOCUMENTS) {
-    await seedDocument(spec, senderIds.get(spec.senderEmail)!, anchor, report, log);
+    await seedDocument(
+      spec,
+      senderIds.get(spec.senderEmail)!,
+      signatoryUserId,
+      anchor,
+      report,
+      log,
+    );
   }
 
   return report;

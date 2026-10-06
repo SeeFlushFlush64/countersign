@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { inject } from "vitest";
+import { afterAll, inject } from "vitest";
 import { assertLocalDatabaseUrl } from "../../src/lib/database-target";
 import { createDatabase, databaseUrl } from "./postgres";
 
@@ -29,3 +29,9 @@ for (const name of [
 ]) {
   delete process.env[name];
 }
+
+// The renderer keeps one Chromium per process; close it so the worker exits.
+afterAll(async () => {
+  const { closeRenderer } = await import("@/lib/pdf/render");
+  await closeRenderer();
+});

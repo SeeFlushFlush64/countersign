@@ -11,9 +11,13 @@ const initialState: CreateDocumentState = { error: null };
 export function CreateForm({
   senderName,
   senderRole,
+  countersigners,
+  defaultCountersignerId,
 }: {
   senderName: string;
   senderRole: string;
+  countersigners: { id: string; name: string; role: string }[];
+  defaultCountersignerId?: string;
 }) {
   const [state, formAction, pending] = useActionState(
     createDocumentAction,
@@ -83,6 +87,34 @@ export function CreateForm({
             placeholder="Auto-generated from template + counterparty"
           />
         </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend className="label-strip mb-1 text-slate">
+          03 &middot; Countersigner
+        </legend>
+        <label className="flex flex-col gap-1.5">
+          <span className="label-strip text-slate">
+            Company signatory who countersigns after the counterparty
+          </span>
+          <select
+            name="countersignerId"
+            required
+            defaultValue={defaultCountersignerId}
+            className="rounded-md border border-panel-border bg-ink px-3 py-2 text-sm text-paper focus:border-signal focus:outline-none"
+          >
+            {countersigners.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} &middot; {c.role}
+              </option>
+            ))}
+          </select>
+        </label>
+        {countersigners.length === 0 && (
+          <p className="text-xs text-danger">
+            No company signatories exist yet, so nothing can be countersigned.
+          </p>
+        )}
       </fieldset>
 
       {state.error && (

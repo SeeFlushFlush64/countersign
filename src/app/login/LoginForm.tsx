@@ -3,8 +3,14 @@
 import { useActionState, useState } from "react";
 import { authenticate, type LoginState } from "./actions";
 
-const DEMO_EMAIL = "demo@countersign.dev";
+// Published demo accounts (fictional people, created by the seed). The
+// signatory can countersign; the paralegal can create and send but is
+// refused at countersignature.
 const DEMO_PASSWORD = "countersign-demo";
+const DEMO_ACCOUNTS = [
+  { label: "Signatory (can countersign)", email: "demo@countersign.dev" },
+  { label: "Paralegal (cannot countersign)", email: "paralegal@countersign.dev" },
+];
 
 const initialState: LoginState = { error: null };
 
@@ -58,20 +64,26 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         </button>
       </form>
 
-      <div className="rounded-md border border-panel-border bg-panel px-4 py-3">
-        <p className="label-strip text-slate">Demo login</p>
-        <p className="mt-1.5 font-mono text-xs text-paper">{DEMO_EMAIL}</p>
-        <p className="font-mono text-xs text-paper">{DEMO_PASSWORD}</p>
-        <button
-          type="button"
-          onClick={() => {
-            setEmail(DEMO_EMAIL);
-            setPassword(DEMO_PASSWORD);
-          }}
-          className="label-strip mt-3 text-signal hover:underline"
-        >
-          Fill in demo credentials &rarr;
-        </button>
+      <div className="flex flex-col gap-3 rounded-md border border-panel-border bg-panel px-4 py-3">
+        <p className="label-strip text-slate">
+          Demo logins &middot; password {DEMO_PASSWORD}
+        </p>
+        {DEMO_ACCOUNTS.map((account) => (
+          <div key={account.email}>
+            <p className="label-strip text-slate-dim">{account.label}</p>
+            <p className="font-mono text-xs text-paper">{account.email}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail(account.email);
+                setPassword(DEMO_PASSWORD);
+              }}
+              className="label-strip mt-1 text-signal hover:underline"
+            >
+              Fill in &rarr;
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 import { describeDatabaseTarget } from "../src/lib/database-target";
+import { closeRenderer } from "../src/lib/pdf/render";
 import { seed, seedAnchorFor } from "./seed-lib";
 
 // CLI entry for `npm run seed`. The seed logic lives in ./seed-lib so tests
@@ -35,7 +36,8 @@ async function main() {
 
   console.log(
     `Seed complete: ${report.created.length} created, ${report.skipped.length} already present, ` +
-      `${report.mismatched.length} mismatched, ${report.duplicated.length} duplicated.`,
+      `${report.mismatched.length} mismatched, ${report.duplicated.length} duplicated, ` +
+      `${report.backfilled.length} given a countersigner.`,
   );
 }
 
@@ -45,5 +47,8 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    // The renderer keeps Chromium alive between renders; without closing it
+    // the process would never exit.
+    await closeRenderer();
     await prisma.$disconnect();
   });

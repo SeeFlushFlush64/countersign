@@ -1,106 +1,147 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import {
+  countersign,
   createDocument,
   DocumentFlowError,
+  ORDER_VIOLATION_MESSAGE,
   sendDocument,
-  signAsSigner,
+  signAsCounterparty,
 } from "@/lib/documents";
-import { DocumentStatus, PartyRole, Role } from "@/generated/prisma/enums";
+import { DocumentStatus } from "@/generated/prisma/enums";
 import { expectPrivateEmptyDatabase } from "./harness/private-database";
+import {
+  COMPANY_SIGNATURE,
+  COUNTERPARTY_SIGNATURE,
+  type Company,
+  makeAgreement,
+  makeCompany,
+  stateOf,
+} from "./helpers/agreements";
 
-// Characterization tests for the signing-order guard as it exists before the
-// Phase B rebuild: sequential behaviour only. Concurrency, authorization and
-// renderer-security regressions are Phase B's suite.
+// The product's invariant, step by step (one request at a time). Concurrent
+// attempts are in concurrency.test.ts; who may countersign is in
+// authorization.test.ts.
 
-// A 1×1 transparent PNG.
-const SIGNATURE =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-
-let senderId: string;
+let company: Company;
 
 beforeAll(async () => {
   await expectPrivateEmptyDatabase();
-  const sender = await prisma.sender.create({
-    data: { name: "Test Sender", email: "sender@test.example", role: Role.GENERAL_COUNSEL },
-  });
-  senderId = sender.id;
+  company = await makeCompany();
 });
 
-async function newAgreement(send = true) {
-  const document = await createDocument({
-    senderId,
-    templateType: "NDA",
-    title: "Signing order test",
-    counterpartyName: "Counterparty Co",
-    counterpartyEmail: "cp@test.example",
-  });
-  if (send) await sendDocument(document.id);
-  const signers = await prisma.signer.findMany({ where: { documentId: document.id } });
-  return {
-    id: document.id,
-    company: signers.find((s) => s.partyRole === PartyRole.COMPANY)!.id,
-    counterparty: signers.find((s) => s.partyRole === PartyRole.COUNTERPARTY)!.id,
-  };
-}
+const asSignatory = () => ({ userId: company.signatory.userId });
 
-async function statusOf(id: string) {
-  return (await prisma.document.findUniqueOrThrow({ where: { id } })).status;
-}
+describe("signing order", () => {
+  it("refuses the company countersignature before the counterparty signs", async () => {
+    const a = await makeAgreement(company, "sent");
 
-describe("signing order (sequential)", () => {
-  it("refuses a company signature before the counterparty has signed", async () => {
-    const a = await newAgreement();
-    await expect(signAsSigner(a.company, SIGNATURE)).rejects.toThrowError(
-      new DocumentFlowError("The counterparty must sign before the company can countersign."),
-    );
-    expect(await statusOf(a.id)).toBe(DocumentStatus.SENT);
-    const company = await prisma.signer.findUniqueOrThrow({ where: { id: a.company } });
-    expect(company.signedAt).toBeNull();
+    await expect(
+      countersign(a.id, asSignatory(), {
+        signature: COMPANY_SIGNATURE,
+        expectedSha256: a.frozenSha256,
+      }),
+    ).rejects.toThrowError(new DocumentFlowError(ORDER_VIOLATION_MESSAGE));
+
+    const state = await stateOf(a.id);
+    expect(state.status).toBe(DocumentStatus.SENT);
+    expect(state.countersignedAt).toBeNull();
+    expect(state.signerSignedAt.COMPANY).toBeNull();
+    expect(state.events.SIGNED).toBe(0);
   });
 
-  it("executes when the counterparty signs first and the company countersigns", async () => {
-    const a = await newAgreement();
+  it("executes when the counterparty signs first and the signatory countersigns", async () => {
+    const a = await makeAgreement(company, "sent");
 
-    await signAsSigner(a.counterparty, SIGNATURE);
-    expect(await statusOf(a.id)).toBe(DocumentStatus.PARTIALLY_SIGNED);
+    await signAsCounterparty(a.counterpartySignerId, {
+      signature: COUNTERPARTY_SIGNATURE,
+      expectedSha256: a.frozenSha256,
+    });
+    let state = await stateOf(a.id);
+    expect(state.status).toBe(DocumentStatus.PARTIALLY_SIGNED);
+    expect(state.counterpartySignedAt).not.toBeNull();
+    expect(state.signerSignedAt.COUNTERPARTY).toEqual(state.counterpartySignedAt);
 
-    await signAsSigner(a.company, SIGNATURE);
-    const document = await prisma.document.findUniqueOrThrow({ where: { id: a.id } });
-    expect(document.status).toBe(DocumentStatus.FULLY_EXECUTED);
-    expect(document.completedAt).not.toBeNull();
-    expect(document.pdfData?.length ?? 0).toBeGreaterThan(0);
+    const artifact = await countersign(a.id, asSignatory(), {
+      signature: COMPANY_SIGNATURE,
+      expectedSha256: a.frozenSha256,
+    });
+    expect(artifact.status).toBe("READY");
+
+    state = await stateOf(a.id);
+    expect(state.status).toBe(DocumentStatus.FULLY_EXECUTED);
+    expect(state.countersignedAt!.getTime()).toBeGreaterThanOrEqual(
+      state.counterpartySignedAt!.getTime(),
+    );
+    expect(state.completedAt).toEqual(state.countersignedAt);
+    expect(state.events).toEqual({ SENT: 1, SIGNED: 2, FULLY_EXECUTED: 1 });
   });
 
-  it("refuses a second signature from the same party", async () => {
-    const a = await newAgreement();
-    await signAsSigner(a.counterparty, SIGNATURE);
-    await expect(signAsSigner(a.counterparty, SIGNATURE)).rejects.toThrowError(
-      DocumentFlowError,
-    );
+  it("refuses a second counterparty signature and a second countersignature", async () => {
+    const a = await makeAgreement(company, "counterpartySigned");
+    await expect(
+      signAsCounterparty(a.counterpartySignerId, {
+        signature: COUNTERPARTY_SIGNATURE,
+        expectedSha256: a.frozenSha256,
+      }),
+    ).rejects.toThrowError(DocumentFlowError);
+
+    await countersign(a.id, asSignatory(), {
+      signature: COMPANY_SIGNATURE,
+      expectedSha256: a.frozenSha256,
+    });
+    await expect(
+      countersign(a.id, asSignatory(), {
+        signature: COMPANY_SIGNATURE,
+        expectedSha256: a.frozenSha256,
+      }),
+    ).rejects.toThrowError("This agreement has already been executed.");
+    expect((await stateOf(a.id)).events).toEqual({ SENT: 1, SIGNED: 2, FULLY_EXECUTED: 1 });
   });
 
-  it("refuses any signature on a draft or an executed agreement", async () => {
-    const draft = await newAgreement(false);
-    await expect(signAsSigner(draft.counterparty, SIGNATURE)).rejects.toThrowError(
-      DocumentFlowError,
-    );
+  it("treats an executed agreement as terminal", async () => {
+    const a = await makeAgreement(company, "executed");
+    await expect(
+      signAsCounterparty(a.counterpartySignerId, {
+        signature: COUNTERPARTY_SIGNATURE,
+        expectedSha256: a.frozenSha256,
+      }),
+    ).rejects.toThrowError(DocumentFlowError);
+    await expect(
+      sendDocument(a.id, { userId: company.paralegal.userId }),
+    ).rejects.toThrowError("Only draft agreements can be sent.");
+  });
 
-    const executed = await newAgreement();
-    await signAsSigner(executed.counterparty, SIGNATURE);
-    await signAsSigner(executed.company, SIGNATURE);
-    await expect(signAsSigner(executed.company, SIGNATURE)).rejects.toThrowError(
-      DocumentFlowError,
-    );
-    await expect(sendDocument(executed.id)).rejects.toThrowError(DocumentFlowError);
+  it("refuses any signature on a draft", async () => {
+    const a = await makeAgreement(company, "draft");
+    await expect(
+      signAsCounterparty(a.counterpartySignerId, {
+        signature: COUNTERPARTY_SIGNATURE,
+        expectedSha256: "0".repeat(64),
+      }),
+    ).rejects.toThrowError("This agreement has not been sent for signature yet.");
+  });
+
+  it("refuses a signature bound to a different document hash", async () => {
+    const a = await makeAgreement(company, "sent");
+    await expect(
+      signAsCounterparty(a.counterpartySignerId, {
+        signature: COUNTERPARTY_SIGNATURE,
+        expectedSha256: "f".repeat(64),
+      }),
+    ).rejects.toThrowError(/changed since you opened it/);
+    expect((await stateOf(a.id)).status).toBe(DocumentStatus.SENT);
   });
 
   it("stamps every step with the injected clock", async () => {
     const t0 = new Date("2026-01-05T09:00:00.000Z");
     const t1 = new Date("2026-01-05T09:15:00.000Z");
+    const t2 = new Date("2026-01-05T11:00:00.000Z");
+    const t3 = new Date("2026-01-06T10:00:00.000Z");
     const document = await createDocument(
       {
-        senderId,
+        senderId: company.paralegal.senderId,
+        countersignerId: company.signatory.userId,
         templateType: "NDA",
         title: "Clock test",
         counterpartyName: "Counterparty Co",
@@ -108,17 +149,42 @@ describe("signing order (sequential)", () => {
       },
       { now: t0 },
     );
-    await sendDocument(document.id, { now: t1 });
+    const { frozenSha256 } = await sendDocument(
+      document.id,
+      { userId: company.paralegal.userId },
+      { now: t1 },
+    );
+    const [counterparty] = await prisma.signer.findMany({
+      where: { documentId: document.id, partyRole: "COUNTERPARTY" },
+    });
+    await signAsCounterparty(
+      counterparty.id,
+      { signature: COUNTERPARTY_SIGNATURE, expectedSha256: frozenSha256 },
+      { now: t2 },
+    );
+    await countersign(
+      document.id,
+      asSignatory(),
+      { signature: COMPANY_SIGNATURE, expectedSha256: frozenSha256 },
+      { now: t3 },
+    );
 
     const row = await prisma.document.findUniqueOrThrow({
       where: { id: document.id },
-      include: { statusEvents: { orderBy: { timestamp: "asc" } } },
+      include: { statusEvents: { orderBy: [{ timestamp: "asc" }, { eventType: "asc" }] } },
     });
-    expect(row.createdAt).toEqual(t0);
-    expect(row.sentAt).toEqual(t1);
+    expect([row.createdAt, row.sentAt, row.counterpartySignedAt, row.countersignedAt]).toEqual([
+      t0,
+      t1,
+      t2,
+      t3,
+    ]);
     expect(row.statusEvents.map((e) => [e.eventType, e.timestamp])).toEqual([
       ["CREATED", t0],
       ["SENT", t1],
+      ["SIGNED", t2],
+      ["SIGNED", t3],
+      ["FULLY_EXECUTED", t3],
     ]);
   });
 });
