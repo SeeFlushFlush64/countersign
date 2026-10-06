@@ -84,9 +84,13 @@ describe("exactly one winner", () => {
     const state = await stateOf(a.id);
     expect(state.status).toBe(DocumentStatus.SENT);
     expect(state.events.SENT).toBe(1);
-    expect(state.artifacts).toEqual([{ kind: ArtifactKind.FROZEN, status: "READY" }]);
+    expect(state.artifacts.filter((x) => x.kind !== ArtifactKind.PREVIEW)).toEqual([
+      { kind: ArtifactKind.FROZEN, status: "READY" },
+    ]);
     const row = await prisma.document.findUniqueOrThrow({ where: { id: a.id } });
-    const frozen = await prisma.documentArtifact.findFirstOrThrow({ where: { documentId: a.id } });
+    const frozen = await prisma.documentArtifact.findFirstOrThrow({
+      where: { documentId: a.id, kind: ArtifactKind.FROZEN },
+    });
     expect(row.frozenSha256).toBe(frozen.sha256);
   });
 });

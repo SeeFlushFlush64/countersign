@@ -238,7 +238,7 @@ async function seedDocument(
 
   if (spec.stage === "counterpartySigned" || spec.stage === "executed") {
     // Sequential signing: the counterparty opens their link and signs
-    // first… (the token is used here and never printed or stored)
+    // first… (the token is never printed; the demo outbox keeps it sealed)
     const counterparty = await signerFor(document.id, PartyRole.COUNTERPARTY);
     await recordLinkView(signingLinkId, {}, { now: at(SCHEDULE.counterpartyViewed) });
     await signWithLink(

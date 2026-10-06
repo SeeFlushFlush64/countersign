@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { listAgreements } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 import { StatStrip } from "@/components/StatStrip";
 import { DocumentsTable, type DocumentRow } from "@/components/DocumentsTable";
@@ -10,10 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DocumentsPage() {
   await requireUser();
-  const documents = await prisma.document.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { sender: true, signers: true },
-  });
+  const documents = await listAgreements();
 
   const rows: DocumentRow[] = documents.map((doc) => ({
     id: doc.id,

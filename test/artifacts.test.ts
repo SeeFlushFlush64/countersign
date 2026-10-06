@@ -26,9 +26,11 @@ beforeAll(async () => {
   company = await makeCompany();
 });
 
+// PDF bytes are omitted by default (src/lib/prisma.ts); ask for them.
 async function artifact(documentId: string, kind: ArtifactKind) {
   return prisma.documentArtifact.findUniqueOrThrow({
     where: { documentId_kind: { documentId, kind } },
+    omit: { pdfData: false },
   });
 }
 
@@ -200,9 +202,9 @@ describe("failure and recovery (audit: executed agreement left with a stale PDF)
 describe("which PDF is served", () => {
   it("serves the draft preview, then the frozen copy, then the executed PDF", async () => {
     const draft = await makeAgreement(company, "draft");
-    const draftRow = await prisma.document.findUniqueOrThrow({ where: { id: draft.id } });
+    const preview = await artifact(draft.id, ArtifactKind.PREVIEW);
     const draftPdf = await loadAgreementPdf(draft.id);
-    expect(sha256Hex((draftPdf as { pdf: Uint8Array }).pdf)).toBe(sha256Hex(draftRow.pdfData!));
+    expect(sha256Hex((draftPdf as { pdf: Uint8Array }).pdf)).toBe(preview.sha256);
 
     const sent = await makeAgreement(company, "sent");
     const sentPdf = await loadAgreementPdf(sent.id);

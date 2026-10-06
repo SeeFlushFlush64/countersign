@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { loadAgreementPdf } from "@/lib/documents";
 
 // Company access to an agreement's PDF: executed if READY, otherwise the
-// frozen copy, otherwise the draft preview. Requires a signed-in company
+// frozen copy; an agreement never sent shows its draft preview. A derived
+// PDF that is not READY is generated again here (idempotent) before 503. Requires a signed-in company
 // user, checked here rather than left to the proxy. Counterparties use their
 // link-scoped route (/s/[token]/document) instead.
 export async function GET(
@@ -27,7 +28,7 @@ export async function GET(
   }
   if ("pending" in result) {
     return NextResponse.json(
-      { error: "The executed PDF is not ready yet. Try again shortly." },
+      { error: "This PDF is not ready yet. Try again shortly." },
       { status: 503, headers: { "Retry-After": "5", "Cache-Control": "no-store" } },
     );
   }

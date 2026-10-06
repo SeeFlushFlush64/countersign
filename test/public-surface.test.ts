@@ -37,6 +37,7 @@ describe("proxy matcher", () => {
   it.each([
     "/",
     "/activity",
+    "/outbox",
     "/senders",
     "/create",
     "/documents/abc",
@@ -59,6 +60,7 @@ describe("internal pages without a session", () => {
   it.each([
     ["dashboard", "@/app/(shell)/page"],
     ["activity", "@/app/(shell)/activity/page"],
+    ["outbox", "@/app/(shell)/outbox/page"],
     ["senders", "@/app/(shell)/senders/page"],
     ["create", "@/app/create/page"],
     ["agreement detail", "@/app/documents/[id]/page"],

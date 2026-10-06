@@ -110,6 +110,7 @@ describe("end to end through the lifecycle", () => {
     expect(artifacts.map((x) => [x.kind, x.status]).sort()).toEqual([
       ["EXECUTED", "READY"],
       ["FROZEN", "READY"],
+      ["PREVIEW", "READY"],
     ]);
   });
 });

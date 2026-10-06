@@ -23,6 +23,14 @@ const SIGNING_CORE = readFileSync(
   path.join(MIGRATIONS, "20261006120000_signing_core/migration.sql"),
   "utf8",
 );
+const ARTIFACT_PREVIEW = readFileSync(
+  path.join(MIGRATIONS, "20261008090000_artifact_preview/migration.sql"),
+  "utf8",
+);
+const DELIVERY_STORAGE = readFileSync(
+  path.join(MIGRATIONS, "20261008090100_delivery_storage/migration.sql"),
+  "utf8",
+);
 
 async function legacyDatabase() {
   const { adminUrl, runPrefix } = inject("testDatabase");
@@ -226,6 +234,99 @@ describe("signing_links migrations (Phase C)", () => {
         "LINK_REISSUED",
         "VOIDED",
       ]);
+    } finally {
+      await client.end();
+    }
+  });
+});
+
+describe("delivery_storage migrations (Phase D)", () => {
+  // A Phase C database: the legacy agreements, plus a draft whose preview
+  // was never stored.
+  async function phaseCDatabase() {
+    const client = await legacyDatabase();
+    await insertLegacyData(client);
+    await client.query(SIGNING_CORE);
+    await client.query(ENUM_VALUES);
+    await client.query(SIGNING_LINKS);
+    await client.query(`
+      INSERT INTO "Document" ("id","title","templateType","senderId","counterpartyName","counterpartyEmail","status")
+        VALUES ('d-draft-nopdf','d-draft-nopdf','NDA','s1','Counterparty','cp@test.example','DRAFT')`);
+    return client;
+  }
+
+  it("move draft previews into artifacts, keeping every existing row and byte", async () => {
+    const client = await phaseCDatabase();
+    try {
+      const before = await client.query(
+        `SELECT "id", encode(sha256("pdfData"), 'hex') AS sha FROM "Document" ORDER BY "id"`,
+      );
+      await client.query(ARTIFACT_PREVIEW);
+      await client.query(DELIVERY_STORAGE);
+
+      // Agreements and their legacy bytes are untouched.
+      const after = await client.query(
+        `SELECT "id", encode(sha256("pdfData"), 'hex') AS sha FROM "Document" ORDER BY "id"`,
+      );
+      expect(after.rows).toEqual(before.rows);
+
+      // Unsent agreements get a PREVIEW: READY from the stored bytes (same
+      // hash), or PENDING when there were none. Sent ones keep FROZEN/EXECUTED.
+      const artifacts = await client.query(
+        `SELECT "documentId","kind","status","sha256" FROM "DocumentArtifact" ORDER BY "documentId","kind"`,
+      );
+      expect(artifacts.rows).toEqual([
+        { documentId: "d-draft", kind: "PREVIEW", status: "READY", sha256: sha(PDF) },
+        { documentId: "d-draft-nopdf", kind: "PREVIEW", status: "PENDING", sha256: null },
+        { documentId: "d-exec", kind: "EXECUTED", status: "READY", sha256: sha(PDF) },
+        { documentId: "d-partial", kind: "FROZEN", status: "READY", sha256: sha(PDF) },
+        { documentId: "d-sent", kind: "FROZEN", status: "READY", sha256: sha(PDF) },
+      ]);
+
+      // Legacy READY artifacts are now immutable too…
+      await expect(
+        client.query(`UPDATE "DocumentArtifact" SET "lastError" = 'x' WHERE "documentId" = 'd-sent'`),
+      ).rejects.toThrowError(/READY and immutable/);
+      await expect(
+        client.query(`DELETE FROM "DocumentArtifact" WHERE "documentId" = 'd-exec'`),
+      ).rejects.toThrowError(/READY and immutable/);
+      // …and the outbox starts empty.
+      expect((await client.query(`SELECT count(*)::int AS n FROM "OutboundMessage"`)).rows[0].n).toBe(0);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("is all-or-nothing: an artifact whose hash does not match its bytes aborts it cleanly", async () => {
+    const client = await phaseCDatabase();
+    try {
+      await client.query(
+        `UPDATE "DocumentArtifact" SET "sha256" = repeat('0', 64) WHERE "documentId" = 'd-sent'`,
+      );
+      await client.query(ARTIFACT_PREVIEW);
+      await expect(client.query(DELIVERY_STORAGE)).rejects.toThrowError(
+        /DocumentArtifact_sha256_matches_bytes/,
+      );
+      await client.query("ROLLBACK").catch(() => {});
+
+      const leftovers = await client.query(`
+        SELECT
+          (SELECT count(*)::int FROM information_schema.tables WHERE table_name = 'OutboundMessage') AS tables,
+          (SELECT count(*)::int FROM "DocumentArtifact" WHERE "kind" = 'PREVIEW') AS previews,
+          (SELECT count(*)::int FROM pg_type WHERE typname = 'DeliveryStatus') AS enums`);
+      expect(leftovers.rows[0]).toEqual({ tables: 0, previews: 0, enums: 0 });
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("re-running the enum step is harmless (safe retry)", async () => {
+    const client = await phaseCDatabase();
+    try {
+      await client.query(ARTIFACT_PREVIEW);
+      await client.query(ARTIFACT_PREVIEW);
+      const values = await client.query(`SELECT unnest(enum_range(NULL::"ArtifactKind"))::text AS v`);
+      expect(values.rows.map((r) => r.v)).toEqual(["FROZEN", "EXECUTED", "PREVIEW"]);
     } finally {
       await client.end();
     }

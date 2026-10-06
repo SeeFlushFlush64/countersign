@@ -18,9 +18,12 @@ process.env.DATABASE_URL = assertLocalDatabaseUrl(
 );
 delete process.env.DIRECT_URL;
 
-// Integrations must never fire from tests, whatever the developer's shell
+// Integrations must never fire from tests, and delivery runs in its default
+// (demo outbox, development key) mode, whatever the developer's shell
 // happens to export.
 for (const name of [
+  "DELIVERY_MODE",
+  "OUTBOX_ENCRYPTION_KEY",
   "GOOGLE_DRIVE_FOLDER_ID",
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",

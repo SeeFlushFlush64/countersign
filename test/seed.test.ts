@@ -29,6 +29,15 @@ const EXPECTED_STATUS = {
   voided: DocumentStatus.VOIDED,
 } as const;
 
+// Sorted message kinds each seeded stage leaves in the outbox.
+const EXPECTED_MESSAGES: Record<keyof typeof EXPECTED_STATUS, string[]> = {
+  draft: [],
+  sent: ["SIGNING_REQUEST"],
+  counterpartySigned: ["COUNTERSIGN_REQUEST", "SIGNING_REQUEST"],
+  executed: ["AGREEMENT_EXECUTED", "AGREEMENT_EXECUTED", "COUNTERSIGN_REQUEST", "SIGNING_REQUEST"],
+  voided: ["AGREEMENT_VOIDED", "SIGNING_REQUEST"],
+};
+
 async function snapshot() {
   const [documents, signers, events, senders, users] = await Promise.all([
     prisma.document.findMany({
@@ -90,18 +99,31 @@ describe("seed", () => {
         select: { kind: true, status: true },
         orderBy: { kind: "asc" },
       });
+      const preview = { kind: ArtifactKind.PREVIEW, status: "READY" };
       expect(artifacts).toEqual(
         spec.stage === "draft"
-          ? []
+          ? [preview]
           : spec.stage === "executed"
             ? [
                 { kind: ArtifactKind.FROZEN, status: "READY" },
                 { kind: ArtifactKind.EXECUTED, status: "READY" },
+                preview,
               ]
-            : [{ kind: ArtifactKind.FROZEN, status: "READY" }],
+            : [{ kind: ArtifactKind.FROZEN, status: "READY" }, preview],
       );
       expect(row.createdAt).toEqual(createdAt);
-      expect(row.pdfData?.length ?? 0).toBeGreaterThan(0);
+
+      // Every notification went to the demo outbox at the time of its step.
+      const messages = await prisma.outboundMessage.findMany({
+        where: { documentId: row.id },
+        select: { kind: true, status: true, channel: true, createdAt: true, deliveredAt: true },
+      });
+      expect(messages.map((m) => m.kind).sort()).toEqual(EXPECTED_MESSAGES[spec.stage]);
+      for (const message of messages) {
+        expect(message).toMatchObject({ status: "DELIVERED", channel: "DEMO_OUTBOX" });
+        expect(message.deliveredAt).toEqual(message.createdAt);
+        expect(message.createdAt.getTime()).toBeLessThanOrEqual(ANCHOR.getTime());
+      }
       expect(row.sentAt).toEqual(spec.stage === "draft" ? null : at(SCHEDULE.sent));
       expect(row.completedAt).toEqual(
         spec.stage === "executed" ? at(SCHEDULE.companySigned) : null,

@@ -31,6 +31,7 @@ const { sendDocumentAction, reissueLinkAction, voidDocumentAction } = await impo
   "@/app/documents/[id]/actions"
 );
 const { signLinkAction } = await import("@/app/s/[token]/actions");
+const { retryDeliveryAction, dispatchDueAction } = await import("@/app/(shell)/outbox/actions");
 
 let company: Company;
 
@@ -186,5 +187,42 @@ describe("signLinkAction (public counterparty action)", () => {
     const metadata = event.metadata as { ipHash: string | null; userAgent: string | null };
     expect(metadata.userAgent).toBe("vitest-agent");
     expect(JSON.stringify(event.metadata)).not.toContain("203.0.113.9");
+  });
+});
+
+describe("outbox actions", () => {
+  async function failedMessage() {
+    const a = await makeAgreement(company, "sent");
+    const message = await prisma.outboundMessage.findFirstOrThrow({ where: { documentId: a.id } });
+    // Put it back in a failed state, as an unreachable provider would leave it.
+    await prisma.outboundMessage.update({
+      where: { id: message.id },
+      data: { status: "FAILED", deliveredAt: null, channel: null, lastError: "provider down" },
+    });
+    return message.id;
+  }
+
+  it("refuse an unauthenticated caller", async () => {
+    const id = await failedMessage();
+    expect(await retryDeliveryAction(id)).toEqual({
+      error: "Sign in to retry this delivery.",
+      result: null,
+    });
+    expect(await dispatchDueAction()).toEqual({
+      error: "Sign in to deliver queued messages.",
+      result: null,
+    });
+    expect((await prisma.outboundMessage.findUniqueOrThrow({ where: { id } })).status).toBe("FAILED");
+  });
+
+  it("let only the agreement's managers retry a delivery", async () => {
+    const id = await failedMessage();
+    signedInAs(company.otherSignatory.userId);
+    expect((await retryDeliveryAction(id)).error).toMatch(/Only the sender or the designated countersigner/);
+    expect((await prisma.outboundMessage.findUniqueOrThrow({ where: { id } })).status).toBe("FAILED");
+
+    signedInAs(company.paralegal.userId);
+    expect(await retryDeliveryAction(id)).toEqual({ error: null, result: "In demo outbox" });
+    expect((await prisma.outboundMessage.findUniqueOrThrow({ where: { id } })).status).toBe("DELIVERED");
   });
 });

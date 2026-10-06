@@ -9,6 +9,21 @@ import { formatLongDate } from "@/lib/format";
 import { sha256Hex } from "@/lib/hash";
 import { InvalidSignatureError, toDataUrl, validateSignature } from "@/lib/signature";
 import { agreementInputSchema, firstIssue, voidReasonSchema } from "@/lib/validation";
+import { DocumentFlowError } from "@/lib/errors";
+import { canManage } from "@/lib/permissions";
+import { outboxKey } from "@/lib/delivery/link-crypto";
+import {
+  cancelUndelivered,
+  deliverMessages,
+  enqueueMessages,
+  type DeliveryDeps,
+} from "@/lib/delivery/outbox";
+import {
+  countersignRequest,
+  executedNotices,
+  signingRequest,
+  voidedNotice,
+} from "@/lib/delivery/messages";
 import {
   hashSigningToken,
   isWellFormedToken,
@@ -41,18 +56,15 @@ import type { TemplateType } from "@/generated/prisma/enums";
 // rolls back. CHECK constraints in the database back up the ordering, void
 // and link rules independently of this code. Transactions that touch both an
 // agreement and its signing link always lock the agreement row first.
+//
+// Notifications follow the transactional-outbox pattern: a step writes its
+// messages in the same transaction (so they exist exactly when the step
+// committed) and delivers them after commit. A failed delivery is recorded on
+// the message and retried; it never undoes or blocks the step. PDFs derived
+// after commit (the draft preview, the executed copy) work the same way: a
+// FAILED artifact, retried on read, never a half-done transition.
 
-export type FlowErrorCode = "NOT_FOUND" | "FORBIDDEN" | "CONFLICT" | "INVALID" | "LINK_INVALID";
-
-export class DocumentFlowError extends Error {
-  constructor(
-    message: string,
-    readonly code: FlowErrorCode = "CONFLICT",
-  ) {
-    super(message);
-    this.name = "DocumentFlowError";
-  }
-}
+export { DocumentFlowError, type FlowErrorCode } from "@/lib/errors";
 
 // Every lifecycle step takes an optional clock so a caller (the seed, tests)
 // can drive the real transitions at fixed times. One `now` per step keeps the
@@ -165,13 +177,19 @@ async function companyUser(actor: Actor) {
   return prisma.user.findUnique({ where: { id: actor.userId }, include: { sender: true } });
 }
 
-// The sender's own login or the designated countersigner may manage an
-// agreement (send, reissue its link, void it).
-function canManage(
-  user: { id: string; senderId: string } | null,
-  document: { senderId: string; countersignerId: string | null },
-): user is { id: string; senderId: string } {
-  return Boolean(user && (user.senderId === document.senderId || user.id === document.countersignerId));
+// ---------------------------------------------------------------------------
+// Delivery after commit. The step has already committed, so nothing here may
+// turn it into an error: a failed delivery is recorded on its message, and if
+// even that is impossible (a database outage) the messages stay queued for
+// the next dispatch.
+
+async function deliverAfterCommit(ids: string[], clock: Clock, deps: DeliveryDeps) {
+  try {
+    await deliverMessages(ids, { adapter: deps.adapter, now: clock.now });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Delivery after commit did not complete; messages stay queued: ${message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +233,7 @@ export async function createDocument(
     createdByUserId?: string;
   },
   { now = new Date() }: Clock = {},
+  deps: Pick<ArtifactDeps, "render"> = {},
 ) {
   const parsed = agreementInputSchema.safeParse(input);
   if (!parsed.success) throw new DocumentFlowError(firstIssue(parsed.error), "INVALID");
@@ -273,19 +292,17 @@ export async function createDocument(
         : { type: "SYSTEM", name: "Countersign (seed)" },
       now,
     );
+    // The draft preview is derived after commit; the binding copy is
+    // rendered and frozen at send.
+    await tx.documentArtifact.create({
+      data: { documentId: created.id, kind: ArtifactKind.PREVIEW, status: ArtifactStatus.PENDING },
+    });
     return created;
   });
 
-  // Draft preview only; the binding copy is rendered and frozen at send.
-  const preview = await renderAgreementPdf(document.id);
-  await prisma.document.update({
-    where: { id: document.id },
-    data: {
-      pdfData: new Uint8Array(preview),
-      pdfUrl: `/api/documents/${document.id}/pdf`,
-    },
-  });
-
+  // A failed preview is recorded (FAILED) and retried when it is next
+  // opened; the agreement exists either way.
+  await generatePreviewArtifact(document.id, deps);
   return document;
 }
 
@@ -327,6 +344,7 @@ export async function sendDocument(
   documentId: string,
   actor: Actor,
   clock: Clock = {},
+  deps: DeliveryDeps = {},
 ) {
   const [document, user] = await Promise.all([
     prisma.document.findUnique({ where: { id: documentId } }),
@@ -348,6 +366,9 @@ export async function sendDocument(
   if (!document.countersignerId) {
     throw new DocumentFlowError("Choose a countersigner before sending.", "INVALID");
   }
+  // The signing request carries the link sealed with the outbox key. Without
+  // a key (in production) nothing is sent, rather than a link stored unsealed.
+  outboxKey();
 
   // Rendered before the transaction: Chromium can take seconds and must not
   // hold row locks. If it fails, nothing has changed.
@@ -355,7 +376,7 @@ export async function sendDocument(
   const frozenSha256 = sha256Hex(frozen);
   const now = clock.now ?? new Date();
 
-  return inTransition("This agreement has already been sent.", () =>
+  const sent = await inTransition("This agreement has already been sent.", () =>
     prisma.$transaction(async (tx) => {
       const moved = await tx.document.updateMany({
         where: { id: documentId, status: DocumentStatus.DRAFT },
@@ -381,9 +402,23 @@ export async function sendDocument(
         now,
         { signingLinkId: link.linkId, metadata: { linkExpiresAt: link.expiresAt.toISOString() } },
       );
-      return { frozenSha256, signingToken: link.token, signingLinkId: link.linkId };
+      const messageIds = await enqueueMessages(
+        tx,
+        [
+          signingRequest(
+            document,
+            { name: user.sender.name, email: user.email },
+            { id: link.linkId, token: link.token, expiresAt: link.expiresAt },
+            false,
+          ),
+        ],
+        now,
+      );
+      return { frozenSha256, signingToken: link.token, signingLinkId: link.linkId, messageIds };
     }),
   );
+  await deliverAfterCommit(sent.messageIds, clock, deps);
+  return sent;
 }
 
 // ---------------------------------------------------------------------------
@@ -404,6 +439,7 @@ export async function reissueSigningLink(
   actor: Actor,
   { expectedLinkId }: { expectedLinkId: string | null },
   clock: Clock = {},
+  deps: DeliveryDeps = {},
 ) {
   const [document, user] = await Promise.all([
     prisma.document.findUnique({ where: { id: documentId } }),
@@ -424,9 +460,10 @@ export async function reissueSigningLink(
       "A signing link can only be reissued while waiting on the counterparty.",
     );
   }
+  outboxKey();
 
   const now = clock.now ?? new Date();
-  return inTransition(REISSUE_CONFLICT_MESSAGE, () =>
+  const reissued = await inTransition(REISSUE_CONFLICT_MESSAGE, () =>
     prisma.$transaction(async (tx) => {
       // Locks the agreement row (a no-op write) so a concurrent counterparty
       // signature, void or reissue serializes with this one.
@@ -455,6 +492,13 @@ export async function reissueSigningLink(
           },
         });
         requireOneRow(revoked.count, REISSUE_CONFLICT_MESSAGE);
+        // The old link's undelivered request must never go out.
+        await cancelUndelivered(
+          tx,
+          { signingLinkId: current.id },
+          "Not sent: the signing link was replaced before delivery.",
+          now,
+        );
       }
 
       const link = await issueSigningLink(tx, documentId, user.id, now);
@@ -478,9 +522,23 @@ export async function reissueSigningLink(
           },
         },
       );
-      return { signingToken: link.token, signingLinkId: link.linkId };
+      const messageIds = await enqueueMessages(
+        tx,
+        [
+          signingRequest(
+            document,
+            { name: user.sender.name, email: user.email },
+            { id: link.linkId, token: link.token, expiresAt: link.expiresAt },
+            true,
+          ),
+        ],
+        now,
+      );
+      return { signingToken: link.token, signingLinkId: link.linkId, messageIds };
     }),
   );
+  await deliverAfterCommit(reissued.messageIds, clock, deps);
+  return reissued;
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +553,7 @@ export async function voidDocument(
   actor: Actor,
   reason: unknown,
   clock: Clock = {},
+  deps: DeliveryDeps = {},
 ) {
   const parsedReason = voidReasonSchema.safeParse(reason);
   if (!parsedReason.success) {
@@ -521,7 +580,7 @@ export async function voidDocument(
 
   const now = clock.now ?? new Date();
   const conflict = "This agreement was executed or voided in the meantime.";
-  await inTransition(conflict, () =>
+  const messageIds = await inTransition(conflict, () =>
     prisma.$transaction(async (tx) => {
       const voided = await tx.document.updateMany({
         where: { id: documentId, status: { in: VOIDABLE } },
@@ -546,8 +605,25 @@ export async function voidDocument(
         now,
         { metadata: { reason: parsedReason.data, statusBeforeVoid: document.status } },
       );
+
+      // Nothing still queued for this agreement may go out after the void,
+      // and a counterparty who was sent it is told it was voided.
+      await cancelUndelivered(
+        tx,
+        { documentId },
+        "Not sent: the agreement was voided before delivery.",
+        now,
+      );
+      return enqueueMessages(
+        tx,
+        document.sentAt
+          ? [voidedNotice(document, { name: user.sender.name, email: user.email }, parsedReason.data)]
+          : [],
+        now,
+      );
     }),
   );
+  await deliverAfterCommit(messageIds, clock, deps);
 }
 
 // ---------------------------------------------------------------------------
@@ -661,6 +737,7 @@ export async function signWithLink(
   { signature, expectedSha256 }: SignatureSubmission,
   context: AuditContext = {},
   clock: Clock = {},
+  deps: DeliveryDeps = {},
 ) {
   const valid = await validSignatureOrFail(signature);
 
@@ -678,7 +755,7 @@ export async function signWithLink(
   }
 
   const now = clock.now ?? new Date();
-  await inTransition("This agreement is no longer awaiting your signature.", () =>
+  const messageIds = await inTransition("This agreement is no longer awaiting your signature.", () =>
     prisma.$transaction(async (tx) => {
       const moved = await tx.document.updateMany({
         where: {
@@ -716,26 +793,49 @@ export async function signWithLink(
         now,
         { metadata: contextMetadata(context) },
       );
+
+      const agreement = await tx.document.findUniqueOrThrow({
+        where: { id: document.id },
+        select: {
+          id: true,
+          title: true,
+          counterpartyName: true,
+          counterpartyEmail: true,
+          countersigner: { select: { email: true, sender: { select: { name: true } } } },
+        },
+      });
+      const countersigner = agreement.countersigner;
+      return enqueueMessages(
+        tx,
+        countersigner
+          ? [countersignRequest(agreement, { name: countersigner.sender.name, email: countersigner.email }, now)]
+          : [],
+        now,
+      );
     }),
   );
+  await deliverAfterCommit(messageIds, clock, deps);
 }
 
 // ---------------------------------------------------------------------------
 // Company countersigns: PARTIALLY_SIGNED → FULLY_EXECUTED
 
-type ArtifactDeps = { stamp?: typeof buildExecutedPdf };
+type ArtifactDeps = {
+  stamp?: typeof buildExecutedPdf;
+  render?: (documentId: string) => Promise<Uint8Array>;
+};
 
 export async function countersign(
   documentId: string,
   actor: Actor,
   { signature, expectedSha256 }: SignatureSubmission,
   clock: Clock = {},
-  deps: ArtifactDeps = {},
+  deps: ArtifactDeps & DeliveryDeps = {},
 ) {
   const valid = await validSignatureOrFail(signature);
 
   const [document, user] = await Promise.all([
-    prisma.document.findUnique({ where: { id: documentId } }),
+    prisma.document.findUnique({ where: { id: documentId }, include: { sender: true } }),
     companyUser(actor),
   ]);
   if (!document) throw new DocumentFlowError("Agreement not found.", "NOT_FOUND");
@@ -764,7 +864,7 @@ export async function countersign(
   }
 
   const now = clock.now ?? new Date();
-  await inTransition("This agreement has already been executed or was voided.", () =>
+  const messageIds = await inTransition("This agreement has already been executed or was voided.", () =>
     prisma.$transaction(async (tx) => {
       const moved = await tx.document.updateMany({
         where: {
@@ -802,38 +902,119 @@ export async function countersign(
         where: { documentId, revokedAt: null, expiresAt: { lt: receiptUntil } },
         data: { expiresAt: receiptUntil },
       });
+
+      // The counterparty's notice carries their still-readable link, copied
+      // sealed from the request that delivered it (the token itself is not
+      // known here).
+      const sealed = await tx.outboundMessage.findFirst({
+        where: {
+          documentId,
+          linkCiphertext: { not: null },
+          signingLink: { activeDocumentId: documentId },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { signingLinkId: true, linkCiphertext: true },
+      });
+      return enqueueMessages(
+        tx,
+        executedNotices(
+          document,
+          document.sender,
+          now,
+          receiptUntil,
+          sealed?.signingLinkId && sealed.linkCiphertext
+            ? { id: sealed.signingLinkId, sealed: sealed.linkCiphertext }
+            : null,
+        ),
+        now,
+      );
     }),
   );
 
-  // After commit: execution is already final. Producing the executed PDF is
-  // derived work — if it fails it is recorded as FAILED and retried later,
-  // and never undoes or blocks the execution itself.
-  return generateExecutedArtifact(documentId, deps);
+  // After commit: execution is already final. The executed PDF and the
+  // notifications are derived work: a failure is recorded (FAILED) and
+  // retried later, and never undoes or blocks the execution itself.
+  const artifact = await generateExecutedArtifact(documentId, deps);
+  await deliverAfterCommit(messageIds, clock, deps);
+  return artifact;
 }
 
 // ---------------------------------------------------------------------------
-// Executed artifact: PENDING/FAILED → READY (idempotent, retryable)
+// Derived artifacts: PENDING/FAILED → READY (idempotent, retryable)
+//
+// PREVIEW (rendered after create) and EXECUTED (stamped after countersign)
+// are produced after their transaction commits. Producing one either stores
+// its bytes and SHA-256 and marks it READY, or records FAILED with the error;
+// a READY artifact is never touched again (a database trigger rejects any
+// change to it). Concurrent attempts converge: only the first to finish
+// stores its bytes, and both are deterministic for the same inputs.
+
+async function completeArtifact(
+  documentId: string,
+  kind: ArtifactKind,
+  produce: () => Promise<Uint8Array>,
+) {
+  const artifact = await prisma.documentArtifact.findUnique({
+    where: { documentId_kind: { documentId, kind } },
+    select: { id: true, status: true, sha256: true },
+  });
+  if (!artifact) return null;
+  if (artifact.status === ArtifactStatus.READY) return artifact;
+
+  try {
+    const pdf = await produce();
+    await prisma.documentArtifact.updateMany({
+      where: { id: artifact.id, status: { not: ArtifactStatus.READY } },
+      data: {
+        status: ArtifactStatus.READY,
+        pdfData: new Uint8Array(pdf),
+        sha256: sha256Hex(pdf),
+        attempts: { increment: 1 },
+        lastError: null,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`${kind} PDF generation failed for agreement ${documentId}: ${message}`);
+    await prisma.documentArtifact.updateMany({
+      where: { id: artifact.id, status: { not: ArtifactStatus.READY } },
+      data: {
+        status: ArtifactStatus.FAILED,
+        attempts: { increment: 1 },
+        lastError: message.slice(0, 500),
+      },
+    });
+  }
+
+  return prisma.documentArtifact.findUniqueOrThrow({
+    where: { id: artifact.id },
+    select: { id: true, status: true, sha256: true },
+  });
+}
+
+export async function generatePreviewArtifact(
+  documentId: string,
+  { render = renderAgreementPdf }: Pick<ArtifactDeps, "render"> = {},
+) {
+  const preview = await completeArtifact(documentId, ArtifactKind.PREVIEW, () => render(documentId));
+  if (!preview) throw new DocumentFlowError("This agreement has no draft preview.", "NOT_FOUND");
+  return preview;
+}
 
 export async function generateExecutedArtifact(
   documentId: string,
   { stamp = buildExecutedPdf }: ArtifactDeps = {},
 ) {
-  const artifact = await prisma.documentArtifact.findUnique({
-    where: { documentId_kind: { documentId, kind: ArtifactKind.EXECUTED } },
-    select: { id: true, status: true, sha256: true },
-  });
-  if (!artifact) {
-    throw new DocumentFlowError("This agreement has not been executed.", "NOT_FOUND");
-  }
-  if (artifact.status === ArtifactStatus.READY) return artifact;
-
-  try {
+  const executed = await completeArtifact(documentId, ArtifactKind.EXECUTED, async () => {
     const document = await prisma.document.findUniqueOrThrow({
       where: { id: documentId },
       include: {
         signers: true,
         countersigner: { include: { sender: true } },
-        artifacts: { where: { kind: ArtifactKind.FROZEN, status: ArtifactStatus.READY } },
+        artifacts: {
+          where: { kind: ArtifactKind.FROZEN, status: ArtifactStatus.READY },
+          select: { pdfData: true },
+        },
       },
     });
     const frozen = document.artifacts[0];
@@ -852,7 +1033,7 @@ export async function generateExecutedArtifact(
     }
 
     const signatory = document.countersigner.sender;
-    const pdf = await stamp({
+    return stamp({
       documentId,
       title: document.title,
       frozenPdf: new Uint8Array(frozen.pdfData),
@@ -871,79 +1052,80 @@ export async function generateExecutedArtifact(
       },
       executedAt: document.countersignedAt,
     });
-
-    await prisma.documentArtifact.updateMany({
-      where: { id: artifact.id, status: { not: ArtifactStatus.READY } },
-      data: {
-        status: ArtifactStatus.READY,
-        pdfData: new Uint8Array(pdf),
-        sha256: sha256Hex(pdf),
-        attempts: { increment: 1 },
-        lastError: null,
-      },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`Executed PDF generation failed for agreement ${documentId}: ${message}`);
-    await prisma.documentArtifact.updateMany({
-      where: { id: artifact.id, status: { not: ArtifactStatus.READY } },
-      data: {
-        status: ArtifactStatus.FAILED,
-        attempts: { increment: 1 },
-        lastError: message.slice(0, 500),
-      },
-    });
-  }
-
-  return prisma.documentArtifact.findUniqueOrThrow({
-    where: { id: artifact.id },
-    select: { id: true, status: true, sha256: true },
   });
+  if (!executed) throw new DocumentFlowError("This agreement has not been executed.", "NOT_FOUND");
+  return executed;
 }
 
 // ---------------------------------------------------------------------------
-// PDFs. Company users (signed in) see the executed PDF if READY, otherwise
-// the frozen copy, otherwise the draft preview. A link holder sees only their
-// own agreement, and only what was sent to them (frozen) or the executed
-// copy — never a draft. An executed agreement whose PDF is not READY gets
-// another (idempotent) generation attempt first.
+// PDFs. These are the only reads of PDF bytes (the client omits them from
+// every other query). Company users (signed in) see the executed PDF if READY,
+// otherwise the frozen copy; an agreement that was never sent shows its draft
+// preview. A link holder sees only their own agreement, and only what was
+// sent to them (frozen) or the executed copy — never a preview. A derived PDF
+// that is not READY gets another (idempotent) generation attempt first, and
+// is reported as pending rather than replaced by an older copy.
 
 type PdfResult = { pdf: Uint8Array; title: string } | { pending: true } | null;
 
-async function executedPdfStillPending(documentId: string): Promise<boolean> {
+async function executedPdfStillPending(documentId: string, deps: ArtifactDeps): Promise<boolean> {
   const hasExecutedArtifact = await prisma.documentArtifact.count({
     where: { documentId, kind: ArtifactKind.EXECUTED },
   });
   // Agreements executed before artifacts existed may have none; they fall
-  // through to whatever PDF they stored.
+  // through to the frozen copy.
   if (!hasExecutedArtifact) return false;
-  const executed = await generateExecutedArtifact(documentId);
+  const executed = await generateExecutedArtifact(documentId, deps);
   return executed.status !== ArtifactStatus.READY;
 }
 
-async function readyArtifact(documentId: string) {
+// The bytes of the first READY artifact among `kinds`, in that order.
+async function readyArtifactBytes(documentId: string, kinds: ArtifactKind[]) {
   const artifacts = await prisma.documentArtifact.findMany({
-    where: { documentId, status: ArtifactStatus.READY },
+    where: { documentId, status: ArtifactStatus.READY, kind: { in: kinds } },
     select: { kind: true, pdfData: true },
   });
-  return (
-    artifacts.find((a) => a.kind === ArtifactKind.EXECUTED) ??
-    artifacts.find((a) => a.kind === ArtifactKind.FROZEN)
-  );
+  for (const kind of kinds) {
+    const bytes = artifacts.find((a) => a.kind === kind)?.pdfData;
+    if (bytes) return new Uint8Array(bytes);
+  }
+  return null;
 }
 
-export async function loadAgreementPdf(documentId: string): Promise<PdfResult> {
+const SENT_PDF_KINDS = [ArtifactKind.EXECUTED, ArtifactKind.FROZEN];
+
+export async function loadAgreementPdf(
+  documentId: string,
+  deps: ArtifactDeps = {},
+): Promise<PdfResult> {
   const document = await prisma.document.findUnique({
     where: { id: documentId },
-    select: { title: true, status: true, pdfData: true },
+    select: { title: true, status: true, sentAt: true },
   });
   if (!document) return null;
 
-  if (document.status === DocumentStatus.FULLY_EXECUTED && (await executedPdfStillPending(documentId))) {
+  if (!document.sentAt) {
+    const preview = await prisma.documentArtifact.findUnique({
+      where: { documentId_kind: { documentId, kind: ArtifactKind.PREVIEW } },
+      select: { status: true },
+    });
+    if (!preview) return null;
+    if (preview.status !== ArtifactStatus.READY) {
+      const retried = await generatePreviewArtifact(documentId, deps);
+      if (retried.status !== ArtifactStatus.READY) return { pending: true };
+    }
+    const pdf = await readyArtifactBytes(documentId, [ArtifactKind.PREVIEW]);
+    return pdf ? { pdf, title: document.title } : null;
+  }
+
+  if (
+    document.status === DocumentStatus.FULLY_EXECUTED &&
+    (await executedPdfStillPending(documentId, deps))
+  ) {
     return { pending: true };
   }
-  const pdf = (await readyArtifact(documentId))?.pdfData ?? document.pdfData;
-  return pdf ? { pdf: new Uint8Array(pdf), title: document.title } : null;
+  const pdf = await readyArtifactBytes(documentId, SENT_PDF_KINDS);
+  return pdf ? { pdf, title: document.title } : null;
 }
 
 export async function loadLinkPdf(token: unknown, now = new Date()): Promise<PdfResult> {
@@ -951,11 +1133,12 @@ export async function loadLinkPdf(token: unknown, now = new Date()): Promise<Pdf
   if (view.state !== "valid") return null;
   const { document } = view;
 
-  if (document.status === DocumentStatus.FULLY_EXECUTED && (await executedPdfStillPending(document.id))) {
+  if (
+    document.status === DocumentStatus.FULLY_EXECUTED &&
+    (await executedPdfStillPending(document.id, {}))
+  ) {
     return { pending: true };
   }
-  const artifact = await readyArtifact(document.id);
-  return artifact?.pdfData
-    ? { pdf: new Uint8Array(artifact.pdfData), title: document.title }
-    : null;
+  const pdf = await readyArtifactBytes(document.id, SENT_PDF_KINDS);
+  return pdf ? { pdf, title: document.title } : null;
 }

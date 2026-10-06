@@ -30,8 +30,9 @@ function OneTimeLink({ path }: { path: string }) {
         {copied ? "Copied" : "Copy link"}
       </button>
       <p className="mt-2 text-xs text-slate-dim">
-        Send this to the counterparty yourself (no email is sent in this demo).
-        It can&rsquo;t be shown again; reissuing creates a new link and
+        No email is sent in this demo: the signature request, with this link,
+        is in the outbox (sealed, and shown only to the sender or
+        countersigner while it works). Reissuing creates a new link and
         immediately disables this one.
       </p>
     </div>
@@ -75,7 +76,8 @@ export function SigningLinkPanel({
           </button>
           <p className="mt-2 text-xs text-slate-dim">
             Freezes the PDF and its SHA-256 and creates a signing link for{" "}
-            {counterpartyName}. No real email is sent in this demo.
+            {counterpartyName}. No real email is sent in this demo; the
+            request goes to the outbox.
           </p>
         </form>
       ) : (

@@ -27,6 +27,30 @@ environment. Without it, counterparty actions fail closed in production
 Treat it like any secret; rotating it only affects how new IP hashes are
 computed (old hashes are never compared across keys).
 
+### 3. Delivery configuration and outbox key
+
+Set both in the production environment:
+
+- `DELIVERY_MODE=demo-outbox`. It is the only mode: no email integration
+  exists, and any other value (or none, in production) makes every delivery
+  fail with a configuration error — recorded on the message, visible in the
+  outbox, retryable once fixed. Agreements are never affected.
+- `OUTBOX_ENCRYPTION_KEY` (at least 32 random characters). Without it, send
+  and reissue fail closed in production (`MissingOutboxKeyError`) before
+  anything changes. Treat it like any secret. Messages sealed under another
+  key (e.g. seeded with the development key) are shown as unreadable and
+  their delivery fails; rotating the key does the same to links already in
+  the outbox (reissue to get a new one). Set it before seeding production.
+
+### 4. Google Drive must not be integrated
+
+The uncommitted `main` working tree contains a Google Drive upload
+(`src/lib/drive.ts`, called while signing). It is not part of this branch and
+must not be brought back into the signing lifecycle when that work is
+integrated: executed PDFs are `DocumentArtifact` rows, and
+`test/production-integrations.test.ts` fails if any source file imports
+Google APIs or an email SDK, or reads their credentials.
+
 ## Production database migration
 
 1. Read-only first: `prisma migrate status` against the production database.
@@ -37,6 +61,26 @@ computed (old hashes are never compared across keys).
    retry).
 3. `prisma migrate deploy` (never `migrate reset` or `db push`).
 4. Seed only deliberately: `SEED_ALLOW_REMOTE=1 npm run seed`.
+
+Phase D read-only pre-check: every stored artifact hash must match its bytes,
+or `delivery_storage` aborts (cleanly, but then needs `migrate resolve
+--rolled-back`):
+
+```sql
+SELECT "id" FROM "DocumentArtifact"
+ WHERE "pdfData" IS NOT NULL AND "sha256" IS DISTINCT FROM encode(sha256("pdfData"), 'hex');
+SELECT "id" FROM "DocumentArtifact" WHERE "status" <> 'READY' AND "pdfData" IS NOT NULL;
+```
+
+Both must return no rows.
+
+### Legacy PDF columns
+
+`Document.pdfData`/`pdfUrl` are no longer written or read: draft previews are
+`PREVIEW` artifacts (backfilled with their hash; a draft without stored bytes
+gets a `PENDING` preview, rendered when first opened). The columns are kept
+because migrations are additive; dropping them is a separate, deliberate
+step once production has been verified.
 
 ### Existing agreements need new signing links
 
@@ -74,6 +118,27 @@ request logs and browser history; responses under `/s/` send
 `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and
 `X-Robots-Tag: noindex`. Anyone holding the link can act as the
 counterparty — there is no second factor (out of scope).
+
+### Outbox and signing links
+
+Delivery is at-least-once through a transactional outbox: a message is
+written in the same transaction as the step that causes it and delivered
+after commit; a failure is recorded on the message (`FAILED`, with the
+error) and retried, automatically up to three attempts and by hand after
+that. There is no background worker: queued and failed messages are
+delivered after each step, from **Outbox → Deliver queued messages**, or by
+**Retry delivery**. A deployment that needs unattended retries must call
+`dispatchDueMessages` on a schedule (not implemented).
+
+Signature requests carry the counterparty's link, so the outbox stores it
+AES-256-GCM encrypted under `OUTBOX_ENCRYPTION_KEY` and bound to its
+`SigningLink` row; a CHECK constraint rejects anything but ciphertext. The
+database alone therefore still never yields a usable link, but the database
+plus the key does. In demo mode the outbox stands in for the counterparty's
+inbox: the agreement's sender and designated countersigner can open the
+link there while it works (the same people who can already reissue it).
+A message whose link was replaced, voided or expired is cancelled, never
+delivered.
 
 ### Audit log
 

@@ -5,9 +5,9 @@
 //     promoted to enums for compile-time safety
 //   - ids are cuid() strings, not auto-increment ints (matches how they'll be
 //     used in public signing URLs)
-//   - Document gains `pdfData` (raw PDF bytes) alongside `pdfUrl`, since the
-//     demo has no external object storage — pdfUrl just points at the API
-//     route that streams pdfData back out
+//   - every PDF is a DocumentArtifact row (PREVIEW, FROZEN, EXECUTED) with
+//     its SHA-256; the Prisma client omits the bytes from every query unless
+//     a query selects them explicitly (src/lib/prisma.ts)
 
 generator client {
   provider = "prisma-client"
@@ -53,8 +53,9 @@ enum DocumentStatus {
 }
 
 enum ArtifactKind {
-  FROZEN   // the agreement as sent; its SHA-256 is what both parties sign
+  FROZEN // the agreement as sent; its SHA-256 is what both parties sign
   EXECUTED // FROZEN pages + execution page with both signatures
+  PREVIEW // the unsent draft, for company users only; never signed
 }
 
 enum ArtifactStatus {
@@ -81,14 +82,14 @@ enum StatusEventType {
 // Who performed an audited action. Events written before this existed have
 // no actor type (a NOT VALID CHECK requires it on every new row).
 enum ActorType {
-  USER              // an authenticated company user (actorUserId)
+  USER // an authenticated company user (actorUserId)
   COUNTERPARTY_LINK // the holder of a signing link (signingLinkId)
-  SYSTEM            // Countersign itself, or the seed script
+  SYSTEM // Countersign itself, or the seed script
 }
 
 enum LinkRevocationReason {
   SUPERSEDED // replaced by a newer link (reissue)
-  VOIDED     // the agreement was voided
+  VOIDED // the agreement was voided
 }
 
 model Sender {
@@ -113,25 +114,27 @@ model User {
   // Only signatories can be designated to countersign agreements.
   isSignatory  Boolean @default(false)
 
-  sender                Sender        @relation(fields: [senderId], references: [id])
-  countersignDocuments  Document[]    @relation("DocumentCountersigner")
-  voidedDocuments       Document[]    @relation("DocumentVoidedBy")
-  issuedSigningLinks    SigningLink[] @relation("SigningLinkIssuedBy")
-  auditEvents           StatusEvent[] @relation("StatusEventActorUser")
+  sender               Sender        @relation(fields: [senderId], references: [id])
+  countersignDocuments Document[]    @relation("DocumentCountersigner")
+  voidedDocuments      Document[]    @relation("DocumentVoidedBy")
+  issuedSigningLinks   SigningLink[] @relation("SigningLinkIssuedBy")
+  auditEvents          StatusEvent[] @relation("StatusEventActorUser")
 }
 
 model Document {
-  id                String   @id @default(cuid())
+  id                String         @id @default(cuid())
   title             String
   templateType      TemplateType
   senderId          String
   counterpartyName  String
   counterpartyEmail String
   status            DocumentStatus @default(DRAFT)
-  createdAt         DateTime @default(now())
+  createdAt         DateTime       @default(now())
   sentAt            DateTime?
   completedAt       DateTime?
-  // Draft preview PDF (re-rendered while the agreement is a draft).
+  // Deprecated, no longer written or read: draft previews are PREVIEW
+  // artifacts now (backfilled by the delivery_storage migration). Kept
+  // because migrations are additive only.
   pdfUrl            String?
   pdfData           Bytes?
 
@@ -159,6 +162,7 @@ model Document {
   artifacts     DocumentArtifact[]
   signingLinks  SigningLink[]      @relation("SigningLinkDocument")
   activeLink    SigningLink?       @relation("SigningLinkActive")
+  messages      OutboundMessage[]
 
   @@index([senderId])
   @@index([status])
@@ -185,20 +189,24 @@ model SigningLink {
   activeDocumentId String?               @unique
   replacedById     String?               @unique
 
-  document       Document      @relation("SigningLinkDocument", fields: [documentId], references: [id], onDelete: Restrict)
-  activeDocument Document?     @relation("SigningLinkActive", fields: [activeDocumentId], references: [id], onDelete: Restrict)
-  signer         Signer        @relation(fields: [signerId], references: [id], onDelete: Restrict)
-  issuedBy       User          @relation("SigningLinkIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
-  replacedBy     SigningLink?  @relation("SigningLinkReplacement", fields: [replacedById], references: [id], onDelete: Restrict)
-  replaces       SigningLink?  @relation("SigningLinkReplacement")
+  document       Document          @relation("SigningLinkDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  activeDocument Document?         @relation("SigningLinkActive", fields: [activeDocumentId], references: [id], onDelete: Restrict)
+  signer         Signer            @relation(fields: [signerId], references: [id], onDelete: Restrict)
+  issuedBy       User              @relation("SigningLinkIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  replacedBy     SigningLink?      @relation("SigningLinkReplacement", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces       SigningLink?      @relation("SigningLinkReplacement")
   auditEvents    StatusEvent[]
+  messages       OutboundMessage[]
 
   @@index([documentId])
 }
 
-// Immutable-once-READY PDF artifacts. FROZEN is written in the same
-// transaction as the send; EXECUTED is created PENDING in the countersign
-// transaction and generated after commit (idempotent, retryable).
+// PDF artifacts, immutable once READY (a trigger rejects any change to, or
+// deletion of, a READY row; a CHECK keeps sha256 equal to the bytes' hash).
+// PREVIEW is created PENDING with the agreement and rendered after commit;
+// FROZEN is written READY in the same transaction as the send; EXECUTED is
+// created PENDING in the countersign transaction and generated after commit.
+// PENDING/FAILED artifacts are generated idempotently and retried on read.
 model DocumentArtifact {
   id         String         @id @default(cuid())
   documentId String
@@ -217,13 +225,13 @@ model DocumentArtifact {
 }
 
 model Signer {
-  id             String    @id @default(cuid())
-  documentId     String
-  partyRole      PartyRole
-  name           String
-  email          String
-  signedAt       DateTime?
-  signatureData  String?
+  id            String    @id @default(cuid())
+  documentId    String
+  partyRole     PartyRole
+  name          String
+  email         String
+  signedAt      DateTime?
+  signatureData String?
 
   document     Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
   signingLinks SigningLink[]
@@ -253,4 +261,65 @@ model StatusEvent {
   signingLink SigningLink? @relation(fields: [signingLinkId], references: [id], onDelete: Restrict)
 
   @@index([documentId])
+}
+
+// ---------------------------------------------------------------------------
+// Delivery: a transactional outbox. Every notification is written in the
+// same transaction as the lifecycle step that causes it, then delivered after
+// commit through a DeliveryAdapter (src/lib/delivery). Delivery never changes
+// the agreement; a failure is recorded on the message and retried.
+
+enum MessageKind {
+  SIGNING_REQUEST // to the counterparty, with their signing link
+  SIGNING_LINK_REISSUED // to the counterparty, with the replacement link
+  COUNTERSIGN_REQUEST // to the designated countersigner
+  AGREEMENT_EXECUTED // to both sides once executed
+  AGREEMENT_VOIDED // to the counterparty, if they had been sent it
+}
+
+enum DeliveryStatus {
+  PENDING // written, never attempted
+  SENDING // claimed by a dispatcher until leaseExpiresAt
+  DELIVERED // handed to the channel (terminal)
+  FAILED // last attempt failed (lastError); retryable
+  CANCELLED // never to be sent: its link was superseded or the agreement voided (terminal)
+}
+
+// Where a message was delivered. Only the demo outbox exists: in demo mode
+// no email leaves Countersign.
+enum DeliveryChannel {
+  DEMO_OUTBOX
+}
+
+model OutboundMessage {
+  id             String           @id @default(cuid())
+  documentId     String
+  kind           MessageKind
+  recipientName  String
+  recipientEmail String
+  subject        String
+  body           String
+  // The counterparty's signing link, encrypted (AES-256-GCM, bound to
+  // signingLinkId) because only a hash of the token exists anywhere else. A
+  // CHECK constraint rejects anything that is not ciphertext.
+  signingLinkId  String?
+  linkCiphertext String?
+  // A link into the company app (not a credential), e.g. the countersign page.
+  appPath        String?
+  status         DeliveryStatus   @default(PENDING)
+  channel        DeliveryChannel?
+  attempts       Int              @default(0)
+  lastError      String?
+  createdAt      DateTime
+  lastAttemptAt  DateTime?
+  leaseExpiresAt DateTime?
+  deliveredAt    DateTime?
+  cancelledAt    DateTime?
+
+  document    Document     @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  signingLink SigningLink? @relation(fields: [signingLinkId], references: [id], onDelete: Restrict)
+
+  @@index([documentId])
+  @@index([status, createdAt])
+  @@index([signingLinkId])
 }

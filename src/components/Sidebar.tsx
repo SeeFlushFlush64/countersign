@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: "Documents", href: "/" },
   { label: "Create", href: "/create" },
   { label: "Activity", href: "/activity" },
+  { label: "Outbox", href: "/outbox" },
   { label: "Senders", href: "/senders" },
 ];
 

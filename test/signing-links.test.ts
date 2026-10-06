@@ -68,11 +68,13 @@ describe("token storage", () => {
     expect(link.tokenHash).toBe(hashSigningToken(a.token));
     expect(link.tokenHash).toBe(sha256Hex(new TextEncoder().encode(a.token)));
 
-    // The raw token appears nowhere in the database.
+    // The raw token appears nowhere in the database (the outbox holds it
+    // only sealed).
     const rows = await prisma.$queryRaw<{ hits: number }[]>`
       SELECT (
         (SELECT count(*) FROM "SigningLink" l WHERE l::text LIKE ${"%" + a.token + "%"}) +
         (SELECT count(*) FROM "StatusEvent" e WHERE e::text LIKE ${"%" + a.token + "%"}) +
+        (SELECT count(*) FROM "OutboundMessage" m WHERE m::text LIKE ${"%" + a.token + "%"}) +
         (SELECT count(*) FROM "Document" d WHERE d.id || d.title || coalesce(d."voidReason", '') LIKE ${"%" + a.token + "%"})
       )::int AS hits`;
     expect(rows[0].hits).toBe(0);
