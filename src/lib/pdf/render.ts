@@ -89,30 +89,41 @@ export async function renderHtmlToPdf(
     // A blocked navigation (e.g. a meta refresh) replaces the document with
     // an error page and would otherwise print a blank PDF without failing.
     // Checked before and after printing, since a navigation can land while
-    // the PDF is being generated.
+    // the PDF is being generated — in which case Chromium may instead abort
+    // the print with a protocol error; that is classified the same way.
     let navigated = false;
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) navigated = true;
     });
+    const integrityError = () =>
+      new RenderIntegrityError(
+        "The agreement did not render as expected; refusing to produce a PDF.",
+      );
     const assertIntact = async () => {
       if (navigated || page.url() !== "about:blank" || !(await page.$(`#${RENDER_SENTINEL_ID}`))) {
-        throw new RenderIntegrityError(
-          "The agreement did not render as expected; refusing to produce a PDF.",
-        );
+        throw integrityError();
       }
     };
 
-    await assertIntact();
-    const pdf = await page.pdf({
-      format: "letter",
-      printBackground: true,
-      preferCSSPageSize: true,
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      footerTemplate: footerHtml,
-    });
-    await assertIntact();
-    return Buffer.from(pdf);
+    try {
+      await assertIntact();
+      const pdf = await page.pdf({
+        format: "letter",
+        printBackground: true,
+        preferCSSPageSize: true,
+        displayHeaderFooter: true,
+        headerTemplate: "<span></span>",
+        footerTemplate: footerHtml,
+      });
+      await assertIntact();
+      return Buffer.from(pdf);
+    } catch (error) {
+      if (error instanceof RenderIntegrityError) throw error;
+      // Let any in-flight navigation event arrive before deciding.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (navigated || page.url() !== "about:blank") throw integrityError();
+      throw error;
+    }
   } finally {
     await context.close().catch(() => {});
   }
