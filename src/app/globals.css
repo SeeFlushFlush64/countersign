@@ -1,21 +1,41 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens.
+ *
+ * Text tiers (measured against ink #0c1116 and panel #141b22):
+ *   paper      primary text                         ~16:1
+ *   slate      secondary text, meta, labels         ~7:1 / 6.5:1  (WCAG AA)
+ *   slate-dim  decoration, icons, disabled only     ~4:1          (not for meaningful small text)
+ *
+ * Lifecycle state colours follow the signing sequence, so the same colour
+ * always means the same thing wherever an agreement's state appears.
+ */
 @theme {
   --color-black: #000000;
   --color-ink: #0c1116;
-  --color-ink-warm: #11161f;
+  --color-ink-warm: #10151c;
   --color-panel: #141b22;
-  --color-panel-hover: #182029;
+  --color-panel-hover: #19212a;
   --color-panel-border: #232c36;
   --color-panel-border-hover: #34404c;
   --color-paper: #edf1f4;
-  --color-slate: #7c8896;
-  --color-slate-dim: #4a545f;
+  --color-slate: #93a0ad;
+  --color-slate-dim: #6b7682;
   --color-signal: #8b85ff;
+  --color-signal-strong: #a29dff;
   --color-live: #3ecf8e;
   --color-alert: #f2a93b;
   --color-danger: #f2555a;
 
+  /* Lifecycle states */
+  --color-state-draft: #93a0ad;
+  --color-state-waiting: #e9a947;
+  --color-state-action: #8b85ff;
+  --color-state-done: #3ecf8e;
+  --color-state-void: #d0676b;
+
+  --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
 }
@@ -28,6 +48,7 @@
 
 :root {
   --color-signal-glow: rgba(139, 133, 255, 0.35);
+  color-scheme: dark;
 }
 
 body {
@@ -41,10 +62,30 @@ body {
   color: var(--color-paper);
 }
 
-/* small tracked-out uppercase labels used for status-strip / terminal microcopy */
-.label-strip {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+/* One visible focus style for every interactive element. In the base layer
+   so a component can replace it (e.g. a whole-row ring) with utilities. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Horizontal scrollers (view tabs on small screens) without a visible bar. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

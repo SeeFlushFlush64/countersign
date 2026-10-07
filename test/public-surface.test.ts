@@ -35,11 +35,14 @@ describe("proxy matcher", () => {
   const matcher = new RegExp(`^${config.matcher[0]}$`);
 
   it.each([
-    "/",
+    "/agreements",
+    "/agreements/new",
+    "/audit",
     "/activity",
     "/outbox",
-    "/senders",
     "/create",
+    "/agreements/abc",
+    "/agreements/abc/countersign",
     "/documents/abc",
     "/documents/abc/countersign",
     "/api/documents/abc/pdf",
@@ -48,7 +51,7 @@ describe("proxy matcher", () => {
     expect(matcher.test(path)).toBe(true);
   });
 
-  it.each(["/s/sometoken", "/s/sometoken/document", "/login", "/api/auth/session"])(
+  it.each(["/", "/s/sometoken", "/s/sometoken/document", "/login", "/api/auth/session", "/icon.svg"])(
     "leaves %s public",
     (path) => {
       expect(matcher.test(path)).toBe(false);
@@ -58,16 +61,28 @@ describe("proxy matcher", () => {
 
 describe("internal pages without a session", () => {
   it.each([
-    ["dashboard", "@/app/(shell)/page"],
-    ["activity", "@/app/(shell)/activity/page"],
+    ["agreements queue", "@/app/(shell)/agreements/page"],
     ["outbox", "@/app/(shell)/outbox/page"],
-    ["senders", "@/app/(shell)/senders/page"],
-    ["create", "@/app/create/page"],
-    ["agreement detail", "@/app/documents/[id]/page"],
-    ["countersign", "@/app/documents/[id]/countersign/page"],
+    ["new agreement", "@/app/(shell)/agreements/new/page"],
+    ["audit log", "@/app/(shell)/audit/page"],
+    ["agreement detail", "@/app/(shell)/agreements/[id]/page"],
+    ["countersign", "@/app/(shell)/agreements/[id]/countersign/page"],
   ])("%s redirects to /login before touching any data", async (_label, modulePath) => {
     const { default: Page } = await import(/* @vite-ignore */ modulePath);
-    const props = { params: Promise.resolve({ id: "any" }) };
+    const props = {
+      params: Promise.resolve({ id: "any" }),
+      searchParams: Promise.resolve({ view: "all" }),
+    };
     await expect(Page(props)).rejects.toThrowError("REDIRECT:/login");
+  });
+
+  it("the public landing page renders without touching any data", async () => {
+    const { default: Landing } = await import("@/app/page");
+    await expect(Landing()).resolves.toBeTruthy();
+  });
+
+  it("the signed-in app frame redirects to /login before touching any data", async () => {
+    const { default: ShellLayout } = await import("@/app/(shell)/layout");
+    await expect(ShellLayout({ children: null })).rejects.toThrowError("REDIRECT:/login");
   });
 });

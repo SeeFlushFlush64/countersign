@@ -13,7 +13,7 @@ export async function authenticate(
     await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirectTo: (formData.get("redirectTo") as string) || "/",
+      redirectTo: (formData.get("redirectTo") as string) || "/agreements",
     });
   } catch (error) {
     if (error instanceof AuthError) {

@@ -26,9 +26,9 @@ vi.mock("next/headers", () => ({
     new Headers({ "user-agent": "vitest-agent", "x-forwarded-for": "203.0.113.9" }),
 }));
 
-const { countersignAction } = await import("@/app/documents/[id]/countersign/actions");
+const { countersignAction } = await import("@/app/(shell)/agreements/[id]/countersign/actions");
 const { sendDocumentAction, reissueLinkAction, voidDocumentAction } = await import(
-  "@/app/documents/[id]/actions"
+  "@/app/(shell)/agreements/[id]/actions"
 );
 const { signLinkAction } = await import("@/app/s/[token]/actions");
 const { retryDeliveryAction, dispatchDueAction } = await import("@/app/(shell)/outbox/actions");

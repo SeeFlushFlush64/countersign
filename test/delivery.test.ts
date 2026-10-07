@@ -135,7 +135,7 @@ describe("the outbox records every notification", () => {
     );
 
     const countersignRequest = messages.find((m) => m.kind === "COUNTERSIGN_REQUEST")!;
-    expect(countersignRequest.appPath).toBe(`/documents/${a.id}/countersign`);
+    expect(countersignRequest.appPath).toBe(`/agreements/${a.id}/countersign`);
     expect(countersignRequest.linkCiphertext).toBeNull();
 
     // The counterparty's executed notice carries their current link (now

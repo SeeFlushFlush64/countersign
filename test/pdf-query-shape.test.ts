@@ -2,7 +2,7 @@ import pg from "pg";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { loadAgreementPdf, loadLinkPdf } from "@/lib/documents";
-import { getAgreementDetail, listAgreements, listOutbox } from "@/lib/queries";
+import { getAgreementDetail, getCountersignView, getSigningRoom, listAgreements, listOutbox } from "@/lib/queries";
 import { expectPrivateEmptyDatabase } from "./harness/private-database";
 import { type Company, makeAgreement, makeCompany } from "./helpers/agreements";
 
@@ -57,6 +57,8 @@ describe("list and detail queries never load PDF bytes", () => {
     ["agreement detail (draft)", () => getAgreementDetail(ids.draft)],
     ["agreement detail (executed)", () => getAgreementDetail(ids.executed)],
     ["outbox", () => listOutbox()],
+    ["countersign page", () => getCountersignView(ids.executed)],
+    ["signing room", () => getSigningRoom(ids.executedToken)],
   ])("%s", async (_label, query) => {
     const { statements, result } = await sqlOf(query);
     expect(statements.length).toBeGreaterThan(0);

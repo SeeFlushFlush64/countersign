@@ -23,7 +23,7 @@ export async function retryDeliveryAction(messageId: string): Promise<RetryState
   try {
     const outcome = await retryDelivery(messageId, { userId });
     revalidatePath("/outbox");
-    revalidatePath("/documents/[id]", "page");
+    revalidatePath("/agreements/[id]", "page");
     return { error: null, result: DELIVERY_STATUS_LABELS[outcome.status] };
   } catch (err) {
     if (err instanceof DocumentFlowError) return { error: err.message, result: null };

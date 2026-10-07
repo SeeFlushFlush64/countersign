@@ -79,9 +79,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, {
       />
       <div className="pointer-events-none absolute inset-x-4 bottom-3 border-t border-slate-dim/40" />
       {empty && (
-        <span className="pointer-events-none absolute bottom-5 left-4 label-strip text-slate-dim/70">
-          sign here
-        </span>
+        <span className="pointer-events-none absolute bottom-5 left-4 text-sm text-ink/45">Sign here</span>
       )}
     </div>
   );

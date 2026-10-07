@@ -12,6 +12,16 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: "bottom-right",
   },
+  // The agreement pages moved under /agreements (Phase E). Old links —
+  // including those in messages already in the outbox — keep working.
+  async redirects() {
+    return [
+      { source: "/documents/:id", destination: "/agreements/:id", permanent: true },
+      { source: "/documents/:id/countersign", destination: "/agreements/:id/countersign", permanent: true },
+      { source: "/create", destination: "/agreements/new", permanent: true },
+      { source: "/activity", destination: "/audit", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

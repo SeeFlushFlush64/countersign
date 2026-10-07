@@ -12,7 +12,7 @@ const session = vi.hoisted(() => ({ current: null as null | { user: Record<strin
 vi.mock("@/auth", () => ({ auth: vi.fn(async () => session.current) }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
-const { createDocumentAction } = await import("@/app/create/actions");
+const { createDocumentAction } = await import("@/app/(shell)/agreements/new/actions");
 
 let company: Company;
 

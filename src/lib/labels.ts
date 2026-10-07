@@ -5,7 +5,6 @@ import type {
   MessageKind,
   Role,
   TemplateType,
-  DocumentStatus,
   StatusEventType,
 } from "@/generated/prisma/enums";
 
@@ -23,22 +22,14 @@ export const TEMPLATE_TYPE_LABELS: Record<TemplateType, string> = {
   LICENSING_ORDER: "Licensing Order",
 };
 
-export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
-  DRAFT: "Draft",
-  SENT: "Sent",
-  PARTIALLY_SIGNED: "Partially Signed",
-  FULLY_EXECUTED: "Fully Executed",
-  VOIDED: "Voided",
-};
-
 export const STATUS_EVENT_LABELS: Record<StatusEventType, string> = {
-  CREATED: "Document created",
+  CREATED: "Agreement created",
   SENT: "Sent for signature",
-  VIEWED: "Document viewed",
-  SIGNED: "Signature captured",
-  FULLY_EXECUTED: "Fully executed",
+  VIEWED: "Counterparty opened the link",
+  SIGNED: "Signed",
+  FULLY_EXECUTED: "Executed",
   LINK_REISSUED: "Signing link reissued",
-  VOIDED: "Agreement voided",
+  VOIDED: "Voided",
 };
 
 export const MESSAGE_KIND_LABELS: Record<MessageKind, string> = {

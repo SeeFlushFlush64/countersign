@@ -55,7 +55,7 @@ export function countersignRequest(
     to: countersigner,
     subject: `Ready for your countersignature: ${agreement.title}`,
     body: `${agreement.counterpartyName} signed "${agreement.title}" at ${at(signedAt)}. It is waiting for your countersignature.`,
-    appPath: `/documents/${agreement.id}/countersign`,
+    appPath: `/agreements/${agreement.id}/countersign`,
   };
 }
 
@@ -88,7 +88,7 @@ export function executedNotices(
       to: sender,
       subject,
       body: `"${agreement.title}" with ${agreement.counterpartyName} was executed at ${at(executedAt)}.`,
-      appPath: `/documents/${agreement.id}`,
+      appPath: `/agreements/${agreement.id}`,
     },
   ];
 }
