@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    # Throwaway Postgres for the test suite. The harness creates and drops its
+    # own databases on it and refuses any non-localhost URL.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: countersign_ci
+          POSTGRES_PASSWORD: countersign_ci
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U countersign_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      TEST_DATABASE_URL: postgresql://countersign_ci:countersign_ci@localhost:5432/postgres
+      # CI never has real credentials. The build only needs these to exist;
+      # nothing connects to them.
+      DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
+      AUTH_SECRET: ci-placeholder-not-a-secret
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's sandbox
+      # needs, which breaks Puppeteer's PDF rendering in the tests.
+      - name: Allow Chromium sandbox
+        run: echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

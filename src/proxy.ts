@@ -6,10 +6,12 @@ import { authConfig } from "./auth.config";
 export default NextAuth(authConfig).auth;
 
 export const config = {
-  // Protects everything except: the public signing room, the PDF endpoint
-  // it embeds (also used internally, so it can't require auth), the login
-  // page itself, NextAuth's own routes, and static assets.
+  // Protects everything except: the public marketing homepage (root path
+  // only — /documents is the protected dashboard), the public signing
+  // room, the PDF endpoint it embeds (also used internally, so it can't
+  // require auth), the login page itself, NextAuth's own routes, favicon/
+  // icon/manifest metadata files, and static assets.
   matcher: [
-    "/((?!api/auth|api/documents|sign|login|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth|api/documents|sign|login|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|assets|$).*)",
   ],
 };

@@ -47,7 +47,7 @@ export default async function DocumentPage({
       {shouldPoll && <LivePoll />}
       <StatusStrip
         segments={[
-          <Link key="home" href="/" className="hover:text-signal">
+          <Link key="home" href="/documents" className="hover:text-signal">
             COUNTERSIGN
           </Link>,
           `DOC ${document.id.slice(-8).toUpperCase()}`,

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { DocumentStatus } from "@/generated/prisma/enums";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Avatar } from "@/components/Avatar";
 
 export type DocumentRow = {
   id: string;
@@ -109,7 +110,12 @@ export function DocumentsTable({ rows }: { rows: DocumentRow[] }) {
               <td className="px-4 py-3 label-strip text-slate">
                 {row.templateLabel}
               </td>
-              <td className="px-4 py-3 text-slate">{row.senderName}</td>
+              <td className="px-4 py-3 text-slate">
+                <span className="inline-flex items-center gap-2">
+                  <Avatar name={row.senderName} />
+                  {row.senderName}
+                </span>
+              </td>
               <td className="px-4 py-3 font-mono text-xs text-slate">
                 {row.signedCount}/{row.totalSigners}
               </td>

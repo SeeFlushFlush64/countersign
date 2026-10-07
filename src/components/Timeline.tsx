@@ -1,14 +1,7 @@
 import type { StatusEventType } from "@/generated/prisma/enums";
 import { STATUS_EVENT_LABELS } from "@/lib/labels";
+import { STATUS_EVENT_DOT } from "@/lib/status-styles";
 import { formatDateTime } from "@/lib/format";
-
-const DOT_CLASS: Record<StatusEventType, string> = {
-  CREATED: "bg-slate",
-  SENT: "bg-alert",
-  VIEWED: "bg-slate-dim",
-  SIGNED: "bg-signal",
-  FULLY_EXECUTED: "bg-live",
-};
 
 export type TimelineEvent = {
   id: string;
@@ -26,7 +19,7 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
             <span className="absolute top-2.5 left-[3px] h-full w-px bg-panel-border" />
           )}
           <span
-            className={`relative z-10 mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${DOT_CLASS[event.eventType]}`}
+            className={`relative z-10 mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_EVENT_DOT[event.eventType]}`}
           />
           <div className="flex flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <div>

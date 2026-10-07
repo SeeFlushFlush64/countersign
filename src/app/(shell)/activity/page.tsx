@@ -1,18 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { STATUS_EVENT_LABELS } from "@/lib/labels";
+import { STATUS_EVENT_DOT } from "@/lib/status-styles";
 import { formatDateTime } from "@/lib/format";
-import type { StatusEventType } from "@/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
-
-const DOT_CLASS: Record<StatusEventType, string> = {
-  CREATED: "bg-slate",
-  SENT: "bg-alert",
-  VIEWED: "bg-slate-dim",
-  SIGNED: "bg-signal",
-  FULLY_EXECUTED: "bg-live",
-};
 
 export default async function ActivityPage() {
   const events = await prisma.statusEvent.findMany({
@@ -62,7 +54,7 @@ export default async function ActivityPage() {
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1.5 text-paper">
                     <span
-                      className={`h-1.5 w-1.5 rounded-full ${DOT_CLASS[event.eventType]}`}
+                      className={`h-1.5 w-1.5 rounded-full ${STATUS_EVENT_DOT[event.eventType]}`}
                     />
                     {STATUS_EVENT_LABELS[event.eventType]}
                   </span>

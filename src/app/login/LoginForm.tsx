@@ -8,13 +8,29 @@ const DEMO_PASSWORD = "countersign-demo";
 
 const initialState: LoginState = { error: null };
 
-export function LoginForm({ redirectTo }: { redirectTo: string }) {
+export function LoginForm({
+  redirectTo,
+  prefillDemo = false,
+}: {
+  redirectTo: string;
+  prefillDemo?: boolean;
+}) {
   const [state, formAction, pending] = useActionState(
     authenticate,
     initialState,
   );
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // "Try the demo" on the marketing homepage links here with ?demo=1 so
+  // the credentials are ready and the visitor only has to click "Sign in".
+  // prefillDemo comes from a server-rendered search param and won't change
+  // for the life of this component, so a lazy initial value is enough —
+  // no effect needed.
+  const [email, setEmail] = useState(prefillDemo ? DEMO_EMAIL : "");
+  const [password, setPassword] = useState(prefillDemo ? DEMO_PASSWORD : "");
+
+  const fillDemoCredentials = () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,10 +80,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         <p className="font-mono text-xs text-paper">{DEMO_PASSWORD}</p>
         <button
           type="button"
-          onClick={() => {
-            setEmail(DEMO_EMAIL);
-            setPassword(DEMO_PASSWORD);
-          }}
+          onClick={fillDemoCredentials}
           className="label-strip mt-3 text-signal hover:underline"
         >
           Fill in demo credentials &rarr;

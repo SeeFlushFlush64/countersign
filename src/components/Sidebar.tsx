@@ -6,9 +6,10 @@ import { logoutAction } from "@/lib/auth-actions";
 import { ROLE_LABELS } from "@/lib/labels";
 import type { Role } from "@/generated/prisma/enums";
 import { initials } from "@/lib/format";
+import { CountersignMark } from "@/components/CountersignMark";
 
 const NAV_ITEMS = [
-  { label: "Documents", href: "/" },
+  { label: "Documents", href: "/documents" },
   { label: "Create", href: "/create" },
   { label: "Activity", href: "/activity" },
   { label: "Senders", href: "/senders" },
@@ -27,9 +28,7 @@ export function Sidebar({
   return (
     <aside className="flex h-screen w-[180px] shrink-0 flex-col border-r border-panel-border bg-ink-warm">
       <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-6 w-6 items-center justify-center border border-signal/50 font-mono text-xs text-signal">
-          C
-        </div>
+        <CountersignMark className="h-6 w-6 text-signal" />
         <span className="font-mono text-sm lowercase tracking-tight text-paper">
           countersign
         </span>
@@ -37,8 +36,7 @@ export function Sidebar({
 
       <nav className="flex flex-col gap-0.5 px-3">
         {NAV_ITEMS.map((item) => {
-          const active =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}

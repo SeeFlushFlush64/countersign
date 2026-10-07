@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderDocumentHtml, renderFooterHtml } from "@/lib/pdf/template";
 import { renderHtmlToPdf } from "@/lib/pdf/render";
+import { isDriveConfigured, uploadPdfToDrive } from "@/lib/drive";
 import { COMPANY_NAME, COMPANY_ADDRESS } from "@/lib/pdf/content";
 import { ROLE_LABELS } from "@/lib/labels";
 import { formatLongDate, formatDateTime } from "@/lib/format";
@@ -9,7 +10,14 @@ import type { TemplateType } from "@/generated/prisma/enums";
 
 export class DocumentFlowError extends Error {}
 
-async function generateAndStorePdf(documentId: string) {
+// Every lifecycle step takes an optional clock so a caller (the seed, tests)
+// can drive the real transitions at fixed times. One `now` per step keeps the
+// row timestamps and the event timestamps of that step identical.
+export type Clock = { now?: Date };
+
+// Renders the PDF from the document's current database state (dates,
+// signatures) and stores it.
+async function generateAndStorePdf(documentId: string): Promise<Buffer> {
   const document = await prisma.document.findUniqueOrThrow({
     where: { id: documentId },
     include: { signers: true, sender: true },
@@ -50,6 +58,8 @@ async function generateAndStorePdf(documentId: string) {
       pdfUrl: `/api/documents/${documentId}/pdf`,
     },
   });
+
+  return pdf;
 }
 
 export async function createDocument(input: {
@@ -58,13 +68,14 @@ export async function createDocument(input: {
   title: string;
   counterpartyName: string;
   counterpartyEmail: string;
-}) {
+}, { now = new Date() }: Clock = {}) {
   const sender = await prisma.sender.findUniqueOrThrow({
     where: { id: input.senderId },
   });
 
   const document = await prisma.document.create({
     data: {
+      createdAt: now,
       title: input.title,
       templateType: input.templateType,
       senderId: input.senderId,
@@ -90,6 +101,7 @@ export async function createDocument(input: {
           {
             eventType: StatusEventType.CREATED,
             actor: sender.name,
+            timestamp: now,
           },
         ],
       },
@@ -101,7 +113,10 @@ export async function createDocument(input: {
   return document;
 }
 
-export async function sendDocument(documentId: string) {
+export async function sendDocument(
+  documentId: string,
+  { now = new Date() }: Clock = {},
+) {
   const document = await prisma.document.findUniqueOrThrow({
     where: { id: documentId },
     include: { sender: true },
@@ -114,19 +129,23 @@ export async function sendDocument(documentId: string) {
   await prisma.$transaction([
     prisma.document.update({
       where: { id: documentId },
-      data: { status: DocumentStatus.SENT, sentAt: new Date() },
+      data: { status: DocumentStatus.SENT, sentAt: now },
     }),
     prisma.statusEvent.create({
       data: {
         documentId,
         eventType: StatusEventType.SENT,
         actor: document.sender.name,
+        timestamp: now,
       },
     }),
   ]);
 }
 
-export async function recordView(signerId: string) {
+export async function recordView(
+  signerId: string,
+  { now = new Date() }: Clock = {},
+) {
   const signer = await prisma.signer.findUniqueOrThrow({
     where: { id: signerId },
   });
@@ -145,12 +164,17 @@ export async function recordView(signerId: string) {
         documentId: signer.documentId,
         eventType: StatusEventType.VIEWED,
         actor: signer.name,
+        timestamp: now,
       },
     });
   }
 }
 
-export async function signAsSigner(signerId: string, signatureData: string) {
+export async function signAsSigner(
+  signerId: string,
+  signatureData: string,
+  { now = new Date() }: Clock = {},
+) {
   const signer = await prisma.signer.findUniqueOrThrow({
     where: { id: signerId },
     include: { document: { include: { signers: true } } },
@@ -184,8 +208,6 @@ export async function signAsSigner(signerId: string, signatureData: string) {
     }
   }
 
-  const now = new Date();
-
   await prisma.signer.update({
     where: { id: signerId },
     data: { signedAt: now, signatureData },
@@ -196,6 +218,7 @@ export async function signAsSigner(signerId: string, signatureData: string) {
       documentId: document.id,
       eventType: StatusEventType.SIGNED,
       actor: signer.name,
+      timestamp: now,
     },
   });
 
@@ -212,6 +235,7 @@ export async function signAsSigner(signerId: string, signatureData: string) {
         documentId: document.id,
         eventType: StatusEventType.FULLY_EXECUTED,
         actor: "Countersign",
+        timestamp: now,
       },
     });
   } else if (document.status === DocumentStatus.SENT) {
@@ -221,5 +245,18 @@ export async function signAsSigner(signerId: string, signatureData: string) {
     });
   }
 
-  await generateAndStorePdf(document.id);
+  const pdf = await generateAndStorePdf(document.id);
+
+  if (allOthersSigned && isDriveConfigured()) {
+    try {
+      await uploadPdfToDrive(
+        `${document.title} (${document.id.slice(-8).toUpperCase()}).pdf`,
+        pdf,
+      );
+    } catch (error) {
+      // Archiving to Drive is a nice-to-have, not part of the signing
+      // contract — a Drive-side failure must never block execution.
+      console.error(`Drive archive failed for document ${document.id}:`, error);
+    }
+  }
 }

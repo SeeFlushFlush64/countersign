@@ -4,9 +4,9 @@ import { StatusStrip } from "@/components/StatusStrip";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; demo?: string }>;
 }) {
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, demo } = await searchParams;
 
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
@@ -21,7 +21,10 @@ export default async function LoginPage({
       </p>
 
       <div className="mt-8 rounded-lg border border-panel-border bg-panel p-6">
-        <LoginForm redirectTo={callbackUrl || "/"} />
+        <LoginForm
+          redirectTo={callbackUrl || "/documents"}
+          prefillDemo={demo === "1"}
+        />
       </div>
     </main>
   );

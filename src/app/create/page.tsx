@@ -16,7 +16,7 @@ export default async function CreatePage() {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-16">
       <StatusStrip
         segments={[
-          <Link key="home" href="/" className="hover:text-signal">
+          <Link key="home" href="/documents" className="hover:text-signal">
             COUNTERSIGN
           </Link>,
           "NEW DOCUMENT",
