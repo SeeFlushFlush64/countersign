@@ -24,6 +24,12 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      // The whole demo stays out of search engines (page metadata and
+      // robots.txt say the same).
+      {
+        source: "/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
       {
         source: "/s/:path*",
         headers: [

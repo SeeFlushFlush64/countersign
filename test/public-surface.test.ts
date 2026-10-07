@@ -47,11 +47,12 @@ describe("proxy matcher", () => {
     "/documents/abc/countersign",
     "/api/documents/abc/pdf",
     "/sign/legacy-signer-id",
+    "/demo/preparing",
   ])("protects %s", (path) => {
     expect(matcher.test(path)).toBe(true);
   });
 
-  it.each(["/", "/s/sometoken", "/s/sometoken/document", "/login", "/api/auth/session", "/icon.svg"])(
+  it.each(["/", "/s/sometoken", "/s/sometoken/document", "/login", "/api/auth/session", "/icon.svg", "/robots.txt"])(
     "leaves %s public",
     (path) => {
       expect(matcher.test(path)).toBe(false);
@@ -67,6 +68,7 @@ describe("internal pages without a session", () => {
     ["audit log", "@/app/(shell)/audit/page"],
     ["agreement detail", "@/app/(shell)/agreements/[id]/page"],
     ["countersign", "@/app/(shell)/agreements/[id]/countersign/page"],
+    ["demo reset", "@/app/demo/preparing/page"],
   ])("%s redirects to /login before touching any data", async (_label, modulePath) => {
     const { default: Page } = await import(/* @vite-ignore */ modulePath);
     const props = {
@@ -84,5 +86,24 @@ describe("internal pages without a session", () => {
   it("the signed-in app frame redirects to /login before touching any data", async () => {
     const { default: ShellLayout } = await import("@/app/(shell)/layout");
     await expect(ShellLayout({ children: null })).rejects.toThrowError("REDIRECT:/login");
+  });
+});
+
+describe("the demo reset without a session", () => {
+  it("refuses to run before touching any data", async () => {
+    const { prepareDemoAction } = await import("@/app/demo/preparing/actions");
+    await expect(prepareDemoAction()).resolves.toEqual({ ok: false, error: "Your session ended. Sign in again." });
+  });
+});
+
+describe("search engines", () => {
+  it("every response says noindex, and robots.txt disallows everything", async () => {
+    const { default: nextConfig } = await import("../next.config");
+    const rules = await nextConfig.headers!();
+    const everywhere = rules.find((rule) => rule.source === "/:path*");
+    expect(everywhere?.headers).toContainEqual({ key: "X-Robots-Tag", value: "noindex, nofollow" });
+
+    const { default: robots } = await import("@/app/robots");
+    expect(robots()).toEqual({ rules: { userAgent: "*", disallow: "/" } });
   });
 });

@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "seed": "tsx prisma/seed.ts",
+    "demo:reset": "tsx prisma/demo-reset.ts",
     "db:reset": "node scripts/migrate.mjs migrate reset --force",
     "db:migrate": "node scripts/migrate.mjs migrate dev",
     "db:deploy": "node scripts/migrate.mjs migrate deploy"

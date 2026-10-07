@@ -7,10 +7,15 @@ import { resolveSigningLink } from "@/lib/documents";
 // shows. None of them can load PDF bytes: the client omits them by default,
 // and these selects never ask for them (test/pdf-query-shape.test.ts checks
 // the SQL). PDFs are only read by the loaders in src/lib/documents.ts.
+//
+// Every read is limited to the current demo epoch: agreements from an earlier
+// session of the demo (since reset) stay in the database but appear nowhere.
+const IN_CURRENT_EPOCH = { epoch: { currentMarker: true } } as const;
 
 // The agreements queue (src/lib/queue.ts decides views and wording).
 export async function listAgreements(): Promise<(QueueAgreement & { templateType: TemplateType })[]> {
   const rows = await prisma.document.findMany({
+    where: IN_CURRENT_EPOCH,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -40,7 +45,7 @@ export async function listAgreements(): Promise<(QueueAgreement & { templateType
 // How many agreements wait on this user's countersignature (navigation hint).
 export function countNeedingCountersign(userId: string) {
   return prisma.document.count({
-    where: { status: DocumentStatus.PARTIALLY_SIGNED, countersignerId: userId },
+    where: { status: DocumentStatus.PARTIALLY_SIGNED, countersignerId: userId, ...IN_CURRENT_EPOCH },
   });
 }
 
@@ -67,8 +72,8 @@ const messageSelect = {
 } as const;
 
 export function getAgreementDetail(id: string) {
-  return prisma.document.findUnique({
-    where: { id },
+  return prisma.document.findFirst({
+    where: { id, ...IN_CURRENT_EPOCH },
     select: {
       id: true,
       title: true,
@@ -110,8 +115,8 @@ export type AgreementDetail = NonNullable<Awaited<ReturnType<typeof getAgreement
 // The countersign page: the frozen document's identity and the
 // counterparty's signature (shown to the countersigner before they sign).
 export function getCountersignView(id: string) {
-  return prisma.document.findUnique({
-    where: { id },
+  return prisma.document.findFirst({
+    where: { id, ...IN_CURRENT_EPOCH },
     select: {
       id: true,
       title: true,
@@ -156,6 +161,7 @@ export async function getSigningRoom(token: string, now: Date = new Date()) {
 
 export function listOutbox(take = 100) {
   return prisma.outboundMessage.findMany({
+    where: { document: IN_CURRENT_EPOCH },
     orderBy: { createdAt: "desc" },
     take,
     select: {
@@ -171,7 +177,7 @@ export type OutboxMessage = Awaited<ReturnType<typeof listOutbox>>[number];
 // optionally for one agreement.
 export function listAuditEvents({ agreementId, take = 200 }: { agreementId?: string; take?: number } = {}) {
   return prisma.statusEvent.findMany({
-    where: agreementId ? { documentId: agreementId } : undefined,
+    where: { document: IN_CURRENT_EPOCH, ...(agreementId ? { documentId: agreementId } : {}) },
     orderBy: [{ timestamp: "desc" }, { id: "desc" }],
     take,
     select: {

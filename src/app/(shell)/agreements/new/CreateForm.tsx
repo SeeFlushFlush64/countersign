@@ -39,10 +39,13 @@ export function CreateForm({
   preparedBy,
   countersigners,
   defaultCountersignerId,
+  exampleDomainsOnly = false,
 }: {
   preparedBy: string;
   countersigners: { id: string; name: string; role: string; you: boolean }[];
   defaultCountersignerId?: string;
+  // The public demo accepts only reserved example addresses.
+  exampleDomainsOnly?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(createDocumentAction, initialState);
   const [counterparty, setCounterparty] = useState("");
@@ -94,9 +97,15 @@ export function CreateForm({
             type="email"
             required
             maxLength={LIMITS.email}
-            placeholder="contracts@ashgrovecreative.com"
+            placeholder="contracts@ashgrove.example"
+            aria-describedby={exampleDomainsOnly ? "email-hint" : undefined}
             className={INPUT}
           />
+          {exampleDomainsOnly && (
+            <span id="email-hint" className="text-xs text-slate">
+              This demo never sends email: use an address ending in .example or .test, or at example.com.
+            </span>
+          )}
         </label>
       </Section>
 

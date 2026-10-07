@@ -12,11 +12,15 @@ export const metadata: Metadata = { title: "New agreement · Countersign" };
 export default async function NewAgreementPage() {
   const { session, user } = await requireUser();
 
-  const signatories = await prisma.user.findMany({
-    where: { isSignatory: true },
-    select: { id: true, sender: { select: { name: true, role: true } } },
-    orderBy: { email: "asc" },
-  });
+  const [signatories, epoch] = await Promise.all([
+    prisma.user.findMany({
+      where: { isSignatory: true },
+      select: { id: true, sender: { select: { name: true, role: true } } },
+      orderBy: { email: "asc" },
+    }),
+    // In a demo epoch the database accepts only example-domain addresses.
+    prisma.demoEpoch.findFirst({ where: { currentMarker: true }, select: { requireExampleDomains: true } }),
+  ]);
   const countersigners = signatories.map((s) => ({
     id: s.id,
     name: s.sender.name,
@@ -45,6 +49,7 @@ export default async function NewAgreementPage() {
       <div className="mt-8 max-w-2xl">
         <CreateForm
           preparedBy={session.user.senderName}
+          exampleDomainsOnly={epoch?.requireExampleDomains ?? false}
           countersigners={countersigners}
           defaultCountersignerId={
             countersigners.some((c) => c.you) ? user.id : countersigners[0]?.id

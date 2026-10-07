@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { Ban, CircleCheck, Clock, Download, Eye, LoaderCircle, RefreshCw, ShieldCheck } from "lucide-react";
+import { Ban, CircleCheck, Clock, Download, Eye, LoaderCircle, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { recordLinkView } from "@/lib/documents";
 import { getSigningRoom } from "@/lib/queries";
@@ -41,6 +41,14 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
           <LinkProblem icon={<RefreshCw aria-hidden className="size-6" />} title="This link was replaced">
             <p>A newer signing link was issued for this agreement, so this one no longer works.</p>
             <p>Use the most recent link you received, or ask the person who sent it for a new one.</p>
+          </LinkProblem>
+        ) : link.state === "reset" ? (
+          <LinkProblem icon={<RotateCcw aria-hidden className="size-6" />} title="This demo has been reset">
+            <p>
+              This link belongs to an earlier session of the Countersign demo. The demo starts fresh after a period
+              of inactivity, and earlier agreements are no longer available.
+            </p>
+            <p>To try the demo again, start from its home page.</p>
           </LinkProblem>
         ) : link.state === "voided" ? (
           <LinkProblem icon={<Ban aria-hidden className="size-6" />} title="This agreement was voided">

@@ -8,10 +8,11 @@ export default NextAuth(authConfig).auth;
 export const config = {
   // Protects everything except: the public landing page (exactly "/"), the
   // counterparty's signing room and its link-scoped PDF (/s/<token>...), the
-  // login page, NextAuth's own routes, and static assets and app icons.
+  // login page, NextAuth's own routes, robots.txt, and static assets and app
+  // icons.
   // Internal pages and the company PDF route also verify the session
   // themselves, so loosening this matcher cannot expose them.
   matcher: [
-    "/((?!api/auth|s/|login|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png).+)",
+    "/((?!api/auth|s/|login|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|robots.txt).+)",
   ],
 };

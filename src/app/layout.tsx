@@ -33,6 +33,9 @@ export const metadata: Metadata = {
   title: "Countersign — Document & E-Signature Demo",
   description:
     "A working document generation and e-signature demo: draft, send, and countersign fictional legal documents end to end.",
+  // A demo with shared, published accounts: kept out of search engines
+  // everywhere (also the X-Robots-Tag header in next.config.ts and robots.txt).
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

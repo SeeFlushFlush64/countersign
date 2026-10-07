@@ -74,7 +74,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     templateType: "NDA",
     title: "Mutual NDA — Ashgrove Creative LLC",
     counterpartyName: "Ashgrove Creative LLC",
-    counterpartyEmail: "hello@ashgrovecreative.com",
+    counterpartyEmail: "hello@ashgrove.example",
     stage: "executed",
     createdHoursAgo: 11 * 24,
   },
@@ -83,7 +83,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     templateType: "VENDOR_AGREEMENT",
     title: "Vendor Services Agreement — Petrel Logistics Co.",
     counterpartyName: "Petrel Logistics Co.",
-    counterpartyEmail: "contracts@petrellogistics.com",
+    counterpartyEmail: "contracts@petrel-logistics.example",
     stage: "counterpartySigned",
     createdHoursAgo: 4 * 24,
   },
@@ -101,7 +101,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     templateType: "LICENSING_ORDER",
     title: "Content Licensing Order — Fenwick Sound Library",
     counterpartyName: "Fenwick Sound Library",
-    counterpartyEmail: "licensing@fenwicksound.com",
+    counterpartyEmail: "licensing@fenwick-sound.example",
     stage: "draft",
     createdHoursAgo: 3,
   },
@@ -110,7 +110,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     templateType: "NDA",
     title: "Mutual NDA — Blackwood Studio Rentals",
     counterpartyName: "Blackwood Studio Rentals",
-    counterpartyEmail: "studio@blackwoodrentals.com",
+    counterpartyEmail: "studio@blackwood-rentals.example",
     stage: "executed",
     createdHoursAgo: 8 * 24,
   },
@@ -175,11 +175,12 @@ async function seedDocument(
   signatoryUserId: string,
   creatorUserId: string | undefined,
   anchor: Date,
+  target: { epochId: number; deferPreviews: boolean },
   report: SeedReport,
   log: (line: string) => void,
 ) {
   const existing = await prisma.document.findMany({
-    where: { title: spec.title, senderId },
+    where: { title: spec.title, senderId, epochId: target.epochId },
     select: { id: true, status: true, countersignerId: true },
     orderBy: { createdAt: "asc" },
   });
@@ -222,8 +223,10 @@ async function seedDocument(
       title: spec.title,
       counterpartyName: spec.counterpartyName,
       counterpartyEmail: spec.counterpartyEmail,
+      epochId: target.epochId,
     },
     { now: createdAt },
+    { deferPreview: target.deferPreviews },
   );
 
   const signatory = { userId: signatoryUserId };
@@ -275,9 +278,16 @@ async function seedDocument(
 export async function seed({
   anchor,
   log = console.log,
+  epochId,
+  deferPreviews = false,
 }: {
   anchor: Date;
   log?: (line: string) => void;
+  // The demo epoch to seed (default: the current one). The demo reset seeds
+  // a new, preparing epoch; documents in other epochs are never looked at.
+  epochId?: number;
+  // Leave draft previews to render when first opened (the demo reset).
+  deferPreviews?: boolean;
 }): Promise<SeedReport> {
   if (Number.isNaN(anchor.getTime())) {
     throw new Error("Seed anchor is not a valid date.");
@@ -343,6 +353,9 @@ export async function seed({
     DEMO_USERS.map((demo) => [demo.senderEmail as string, userIds.get(demo.email)!]),
   );
 
+  const targetEpochId =
+    epochId ?? (await prisma.demoEpoch.findFirstOrThrow({ where: { currentMarker: true }, select: { id: true } })).id;
+
   log("Seeding documents…");
   for (const spec of SEED_DOCUMENTS) {
     await seedDocument(
@@ -351,6 +364,7 @@ export async function seed({
       signatoryUserId,
       userIdBySender.get(spec.senderEmail),
       anchor,
+      { epochId: targetEpochId, deferPreviews },
       report,
       log,
     );
