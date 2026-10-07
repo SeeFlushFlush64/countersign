@@ -2,8 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 import { describeDatabaseTarget } from "../src/lib/database-target";
 import { closeRenderer } from "../src/lib/pdf/render";
-import { ensureFreshDemo } from "../src/lib/demo/epochs";
-import { DEMO_DEFAULTS } from "../src/lib/demo/settings";
+import { resetDemoNow } from "../src/lib/demo/reset-now";
 
 // `npm run demo:reset`: start the public demo fresh now — a new demo epoch,
 // seeded and made current, the previous epoch retired (nothing is deleted).
@@ -11,6 +10,10 @@ import { DEMO_DEFAULTS } from "../src/lib/demo/settings";
 // resets itself lazily (src/lib/demo/epochs.ts).
 //
 //   DEMO_RESET_ALLOW_REMOTE=1  required for anything other than localhost
+//   DELIVERY_MODE, OUTBOX_ENCRYPTION_KEY, AUDIT_IP_HMAC_KEY
+//                              required, valid by production's rules, and the
+//                              same as the deployed app's; checked before
+//                              anything is written (src/lib/demo/reset-now.ts)
 
 async function main() {
   const target = describeDatabaseTarget(process.env.DATABASE_URL);
@@ -19,7 +22,7 @@ async function main() {
     throw new Error("Refusing to reset a remote database. Set DEMO_RESET_ALLOW_REMOTE=1 to do it deliberately.");
   }
   console.log(`Resetting the demo in the ${target} database…`);
-  const result = await ensureFreshDemo({ force: true, settings: { enabled: true, ...DEMO_DEFAULTS } });
+  const result = await resetDemoNow();
   console.log(
     result.outcome === "reset"
       ? `Demo epoch ${result.epochId} is now current.`

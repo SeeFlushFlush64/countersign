@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
     "puppeteer-core",
     "@sparticuz/chromium",
   ],
+  // On Vercel, @sparticuz/chromium unpacks Chromium from the brotli archives
+  // in its bin/ directory, which it finds at runtime by path — file tracing
+  // cannot see that, so without this no function would ship the browser and
+  // every PDF render would fail. All routes: any server code may render.
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/@sparticuz/chromium/bin/**"],
+  },
   // The default bottom-left position sits directly on top of the sidebar's
   // bottom controls (identity block, log out) and physically blocks clicks
   // in dev mode — move it out of the sidebar's way.
