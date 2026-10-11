@@ -1,4 +1,4 @@
-import type { Browser, HTTPRequest } from "puppeteer-core";
+import type { Browser, HTTPRequest, Page } from "puppeteer-core";
 import { RENDER_SENTINEL_ID } from "./template";
 
 // Local dev (incl. Windows) uses the full `puppeteer` package, which ships
@@ -76,9 +76,19 @@ export async function renderHtmlToPdf(
   footerHtml: string,
 ): Promise<Buffer> {
   const browser = await getBrowser();
-  const context = await browser.createBrowserContext();
+  // @sparticuz/chromium runs Chromium with --single-process, and a
+  // single-process Chromium cannot create a second, isolated browser context:
+  // createBrowserContext() followed by newPage() closes the browser ("Protocol
+  // error (Target.createTarget): Target closed"), so on serverless every render
+  // opens a fresh page in the default context instead. Nothing carries over
+  // between renders there: JavaScript is off, every request but the document
+  // itself is aborted, and the page is closed afterwards. Locally (the full,
+  // multi-process puppeteer) each render keeps its own isolated context.
+  const context = isServerless ? null : await browser.createBrowserContext();
+  let opened: Page | undefined;
   try {
-    const page = await context.newPage();
+    const page = await (context ?? browser).newPage();
+    opened = page;
     page.setDefaultTimeout(RENDER_TIMEOUT_MS);
     await page.setJavaScriptEnabled(false);
     await page.setRequestInterception(true);
@@ -125,6 +135,7 @@ export async function renderHtmlToPdf(
       throw error;
     }
   } finally {
-    await context.close().catch(() => {});
+    await opened?.close().catch(() => {});
+    await context?.close().catch(() => {});
   }
 }
