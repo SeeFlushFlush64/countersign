@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
 import { prepareDemoAction } from "./actions";
@@ -10,7 +9,6 @@ import { prepareDemoAction } from "./actions";
 // Starts the reset once on arrival and continues to the agreements when it is
 // done. If it fails, the visitor can carry on with the existing demo.
 export function PrepareDemo() {
-  const router = useRouter();
   const started = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,13 +17,15 @@ export function PrepareDemo() {
     started.current = true;
     prepareDemoAction().then(
       (result) => {
-        if (result.ok) router.replace("/agreements");
+        // A full page load, not the client router: the router may still hold a redirect to this page
+        // that it cached for /agreements (a prefetch made while the reset was due) and would replay it.
+        if (result.ok) window.location.replace("/agreements");
         else setError(result.error);
       },
       // The request itself failed (a timeout, the network): offer to go on.
       () => setError("Preparing the demo is taking longer than expected. Continue to try again."),
     );
-  }, [router]);
+  }, []);
 
   if (error) {
     return (
