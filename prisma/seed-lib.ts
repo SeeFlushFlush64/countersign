@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../src/lib/prisma";
 import { DocumentStatus, PartyRole, Role } from "../src/generated/prisma/enums";
 import type { TemplateType } from "../src/generated/prisma/enums";
@@ -27,7 +28,14 @@ import { signatureDataUrl } from "./png-signature";
 
 export const DEMO_LOGIN_EMAIL = "demo@countersign.dev";
 export const DEMO_PARALEGAL_EMAIL = "paralegal@countersign.dev";
-export const DEMO_LOGIN_PASSWORD = "countersign-demo";
+// The sample accounts no longer have a published password: they are entered
+// through the sample workspace button. This was their old password; the seed
+// replaces any account still holding it with an unusable one.
+export const RETIRED_SAMPLE_PASSWORD = "countersign-demo";
+
+async function unusablePasswordHash(): Promise<string> {
+  return bcrypt.hash(randomBytes(32).toString("hex"), 10);
+}
 
 // Two published demo accounts: a signatory who countersigns every seeded
 // agreement, and a non-signatory who is refused at countersignature.
@@ -72,7 +80,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
   {
     senderEmail: "dana.whitfield@northlight.example",
     templateType: "NDA",
-    title: "Mutual NDA — Ashgrove Creative LLC",
+    title: "Mutual NDA with Ashgrove Creative LLC",
     counterpartyName: "Ashgrove Creative LLC",
     counterpartyEmail: "hello@ashgrove.example",
     stage: "executed",
@@ -81,7 +89,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
   {
     senderEmail: "marcus.ilori@northlight.example",
     templateType: "VENDOR_AGREEMENT",
-    title: "Vendor Services Agreement — Petrel Logistics Co.",
+    title: "Vendor Services Agreement with Petrel Logistics Co.",
     counterpartyName: "Petrel Logistics Co.",
     counterpartyEmail: "contracts@petrel-logistics.example",
     stage: "counterpartySigned",
@@ -90,7 +98,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
   {
     senderEmail: "priya.anand@northlight.example",
     templateType: "MEDIA_RELEASE",
-    title: "Media Release — Jordan Vance",
+    title: "Media Release with Jordan Vance",
     counterpartyName: "Jordan Vance",
     counterpartyEmail: "jordan.vance@example.com",
     stage: "sent",
@@ -99,7 +107,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
   {
     senderEmail: "tomas.reyes@northlight.example",
     templateType: "LICENSING_ORDER",
-    title: "Content Licensing Order — Fenwick Sound Library",
+    title: "Content Licensing Order with Fenwick Sound Library",
     counterpartyName: "Fenwick Sound Library",
     counterpartyEmail: "licensing@fenwick-sound.example",
     stage: "draft",
@@ -108,7 +116,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
   {
     senderEmail: "marcus.ilori@northlight.example",
     templateType: "NDA",
-    title: "Mutual NDA — Blackwood Studio Rentals",
+    title: "Mutual NDA with Blackwood Studio Rentals",
     counterpartyName: "Blackwood Studio Rentals",
     counterpartyEmail: "studio@blackwood-rentals.example",
     stage: "executed",
@@ -117,7 +125,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
   {
     senderEmail: "priya.anand@northlight.example",
     templateType: "VENDOR_AGREEMENT",
-    title: "Vendor Services Agreement — Halcyon Catering Co.",
+    title: "Vendor Services Agreement with Halcyon Catering Co.",
     counterpartyName: "Halcyon Catering Co.",
     counterpartyEmail: "events@halcyon-catering.example",
     stage: "voided",
@@ -327,7 +335,7 @@ export async function seed({
       const created = await prisma.user.create({
         data: {
           email: demo.email,
-          passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10),
+          passwordHash: await unusablePasswordHash(),
           senderId,
           isSignatory: demo.isSignatory,
         },
@@ -335,14 +343,14 @@ export async function seed({
       userIds.set(demo.email, created.id);
       continue;
     }
-    // Keep the published demo credentials and roles as documented.
-    const passwordOk = await bcrypt.compare(DEMO_LOGIN_PASSWORD, existingUser.passwordHash);
-    if (!passwordOk || existingUser.isSignatory !== demo.isSignatory) {
+    // Keep the roles as documented, and retire the old published password.
+    const retired = await bcrypt.compare(RETIRED_SAMPLE_PASSWORD, existingUser.passwordHash);
+    if (retired || existingUser.isSignatory !== demo.isSignatory) {
       await prisma.user.update({
         where: { id: existingUser.id },
         data: {
           isSignatory: demo.isSignatory,
-          ...(passwordOk ? {} : { passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10) }),
+          ...(retired ? { passwordHash: await unusablePasswordHash() } : {}),
         },
       });
     }

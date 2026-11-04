@@ -67,10 +67,10 @@ function Workload({ counts }: { counts: Queue["counts"] }) {
 
   return (
     <div className="mt-2">
-      <p className="text-base text-paper">
+      <p className="text-base text-fg">
         {mine > 0 ? (
           <>
-            <span className="font-semibold text-signal">{plural(mine, "agreement", "agreements")}</span>{" "}
+            <span className="font-semibold text-accent">{plural(mine, "agreement", "agreements")}</span>{" "}
             {mine === 1 ? "needs" : "need"} your countersignature.
           </>
         ) : counts.all > 0 ? (
@@ -79,8 +79,58 @@ function Workload({ counts }: { counts: Queue["counts"] }) {
           "No agreements yet."
         )}
       </p>
-      {others.length > 0 && <p className="mt-0.5 text-sm text-slate">Also {others.join(" · ")}.</p>}
+      {others.length > 0 && <p className="mt-0.5 text-sm text-muted">Also {others.join(" · ")}.</p>}
     </div>
+  );
+}
+
+// The ledger strip: the figure that needs this user leads, and the rest of the
+// pipeline reads left to right in signing order. One bordered strip, not a row
+// of equal cards.
+function SummaryStrip({ counts }: { counts: Queue["counts"] }) {
+  const mine = counts["needs-countersign"];
+  const others = [
+    { view: "drafts" as const, label: "Drafts", value: counts.drafts },
+    { view: "waiting-counterparty" as const, label: "Awaiting counterparty", value: counts["waiting-counterparty"] },
+    {
+      view: "waiting-countersign" as const,
+      label: "Awaiting other countersigners",
+      value: counts["waiting-countersign"],
+    },
+    { view: "executed" as const, label: "Executed", value: counts.executed },
+  ];
+  return (
+    <section
+      aria-label="Summary"
+      className="mt-7 grid overflow-hidden rounded-lg border border-rule bg-surface sm:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]"
+    >
+      <Link
+        href="/agreements?view=needs-countersign"
+        className={`flex flex-col justify-between gap-3 border-b border-rule p-5 transition-colors sm:border-r sm:border-b-0 ${
+          mine > 0 ? "bg-accent text-canvas hover:bg-accent-strong" : "hover:bg-surface-hover"
+        }`}
+      >
+        <span className={`text-sm ${mine > 0 ? "text-canvas/85" : "text-muted"}`}>Awaiting your countersignature</span>
+        <span className="font-[family-name:var(--font-display)] text-5xl leading-none font-semibold tabular-nums">
+          {mine}
+        </span>
+      </Link>
+      <ul className="grid grid-cols-2 divide-x divide-y divide-rule sm:grid-cols-4 sm:divide-y-0">
+        {others.map((item) => (
+          <li key={item.view} className="[&:nth-child(-n+2)]:border-t-0">
+            <Link
+              href={`/agreements?view=${item.view}`}
+              className="flex h-full flex-col justify-between gap-3 p-4 transition-colors hover:bg-surface-hover"
+            >
+              <span className="text-[13px] leading-snug text-muted">{item.label}</span>
+              <span className="font-[family-name:var(--font-display)] text-3xl leading-none font-semibold tabular-nums text-fg">
+                {item.value}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -104,7 +154,7 @@ export default async function AgreementsPage({
     <div className="w-full max-w-[76rem] px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-10">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-paper lg:text-[1.75rem]">
+          <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-fg lg:text-[1.75rem]">
             Agreements
           </h1>
           <Workload counts={queue.counts} />
@@ -122,7 +172,9 @@ export default async function AgreementsPage({
         </Link>
       </header>
 
-      <div className="mt-7">
+      <SummaryStrip counts={queue.counts} />
+
+      <div className="mt-8">
         <QueueTabs active={view} counts={queue.counts} />
       </div>
 
@@ -133,7 +185,7 @@ export default async function AgreementsPage({
         {rows.length > 0 ? (
           <>
             <QueueHeader />
-            <ol className="divide-y divide-panel-border border-b border-panel-border">
+            <ol className="divide-y divide-rule border-b border-rule">
             {rows.map((row) => (
               <AgreementRow
                 key={row.agreement.id}

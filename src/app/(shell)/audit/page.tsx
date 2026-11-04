@@ -50,29 +50,29 @@ export default async function AuditLogPage({
   return (
     <div className="w-full max-w-[76rem] px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-10">
       <header className="max-w-3xl">
-        <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-paper lg:text-[1.75rem]">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-fg lg:text-[1.75rem]">
           Audit log
         </h1>
-        <p className="mt-2 text-sm text-slate">
+        <p className="mt-2 text-sm text-muted">
           Every step on every agreement, newest first. Entries can only be added: the database rejects any edit or
           deletion. Times are UTC.
         </p>
       </header>
 
       {agreementId && (
-        <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-panel-border py-3 text-sm">
-          <span className="text-slate">Showing one agreement:</span>
+        <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-rule py-3 text-sm">
+          <span className="text-muted">Showing one agreement:</span>
           {filteredTitle ? (
             <Link
               href={`/agreements/${agreementId}`}
-              className="inline-flex min-h-11 items-center font-medium text-paper hover:underline lg:min-h-8"
+              className="inline-flex min-h-11 items-center font-medium text-fg hover:underline lg:min-h-8"
             >
               {filteredTitle}
             </Link>
           ) : (
-            <span className="text-paper">no entries found</span>
+            <span className="text-fg">no entries found</span>
           )}
-          <Link href="/audit" className="ml-auto inline-flex h-11 items-center gap-1 text-signal hover:underline lg:h-8">
+          <Link href="/audit" className="ml-auto inline-flex h-11 items-center gap-1 text-accent hover:underline lg:h-8">
             <X aria-hidden className="size-4" />
             Show all agreements
           </Link>
@@ -87,10 +87,10 @@ export default async function AuditLogPage({
         <div className="mt-6 flex flex-col gap-8">
           {days.map((day) => (
             <section key={day.label} aria-labelledby={`day-${day.label}`}>
-              <h2 id={`day-${day.label}`} className="border-b border-panel-border pb-2 text-xs font-medium text-slate">
+              <h2 id={`day-${day.label}`} className="border-b border-rule pb-2 text-xs font-medium text-muted">
                 {day.label}
               </h2>
-              <ol className="divide-y divide-panel-border">
+              <ol className="divide-y divide-rule">
                 {day.events.map((event) => {
                   const Icon = EVENT_ICON[event.eventType];
                   const evidence = evidenceFor(event.eventType, event.metadata);
@@ -98,28 +98,28 @@ export default async function AuditLogPage({
                     <li key={event.id} className="grid grid-cols-[auto_1fr] gap-x-3 py-3 sm:grid-cols-[5.5rem_auto_1fr] sm:gap-x-4">
                       <time
                         dateTime={event.timestamp.toISOString()}
-                        className="col-span-2 font-mono text-xs text-slate tabular-nums sm:col-span-1 sm:pt-0.5"
+                        className="col-span-2 font-mono text-xs text-muted tabular-nums sm:col-span-1 sm:pt-0.5"
                       >
                         {TIME.format(event.timestamp)}
                       </time>
-                      <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-slate" />
+                      <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
                       <div className="min-w-0">
-                        <p className="text-sm text-paper">
+                        <p className="text-sm text-fg">
                           <span className="font-medium">{eventLabel(event.eventType, event.actorType)}</span>
                           {!agreementId && (
                             <>
-                              <span className="text-slate"> · </span>
-                              <Link href={`/agreements/${event.document.id}`} className="text-slate hover:text-paper hover:underline">
+                              <span className="text-muted"> · </span>
+                              <Link href={`/agreements/${event.document.id}`} className="text-muted hover:text-fg hover:underline">
                                 {event.document.title}
                               </Link>
                             </>
                           )}
                         </p>
-                        <p className="mt-0.5 text-[13px] text-slate">
-                          {event.actor} <span className="text-slate">— {actorCapacity(event.actorType)}</span>
+                        <p className="mt-0.5 text-[13px] text-muted">
+                          {event.actor} <span className="text-muted">· {actorCapacity(event.actorType)}</span>
                         </p>
                         {evidence.length > 0 && (
-                          <p className="mt-0.5 text-xs text-slate">{evidence.join(" · ")}</p>
+                          <p className="mt-0.5 text-xs text-muted">{evidence.join(" · ")}</p>
                         )}
                       </div>
                     </li>
@@ -128,7 +128,7 @@ export default async function AuditLogPage({
               </ol>
             </section>
           ))}
-          {events.length >= 200 && <p className="text-xs text-slate">Showing the latest 200 entries.</p>}
+          {events.length >= 200 && <p className="text-xs text-muted">Showing the latest 200 entries.</p>}
         </div>
       )}
     </div>

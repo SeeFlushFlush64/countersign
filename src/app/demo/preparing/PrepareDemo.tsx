@@ -30,7 +30,7 @@ export function PrepareDemo() {
   if (error) {
     return (
       <div role="alert" className="mt-6 flex flex-col items-start gap-4">
-        <p className="text-sm text-slate">{error}</p>
+        <p className="text-sm text-muted">{error}</p>
         <Link href="/agreements" className={buttonClasses("secondary", "md")}>
           Continue to agreements
         </Link>
@@ -38,7 +38,7 @@ export function PrepareDemo() {
     );
   }
   return (
-    <p role="status" className="mt-6 flex items-center gap-2 text-sm text-slate">
+    <p role="status" className="mt-6 flex items-center gap-2 text-sm text-muted">
       <LoaderCircle aria-hidden className="size-4 animate-spin" />
       Preparing…
     </p>

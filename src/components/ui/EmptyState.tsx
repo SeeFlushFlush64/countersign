@@ -15,10 +15,10 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-start gap-3 px-4 py-12 sm:px-5">
-      <Icon aria-hidden className="size-5 text-slate" />
+      <Icon aria-hidden className="size-5 text-muted" />
       <div>
-        <p className="text-[15px] font-medium text-paper">{title}</p>
-        {children && <p className="mt-1 max-w-md text-sm text-slate">{children}</p>}
+        <p className="text-[15px] font-medium text-fg">{title}</p>
+        {children && <p className="mt-1 max-w-md text-sm text-muted">{children}</p>}
       </div>
       {action}
     </div>

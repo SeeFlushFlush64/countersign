@@ -38,7 +38,7 @@ export type StepState = "done" | "current" | "ahead" | "stopped";
 
 export type RailStep = {
   key: "send" | "counterparty" | "countersign";
-  // Who the step belongs to, e.g. "Jordan Vance" — with "(you)" when it is
+  // Who the step belongs to, e.g. "Jordan Vance", with "(you)" when it is
   // the viewer.
   actor: string;
   // What the step is, in the state it is in: "Sent", "Signs first", ...
@@ -172,7 +172,7 @@ export function agreementView(f: AgreementFacts, viewer: Viewer, now: Date = new
       return {
         ...base,
         tone: "neutral",
-        headline: "Draft — not sent yet",
+        headline: "Draft: not sent yet",
         explanation: `Once sent, ${counterparty} signs first through a private link, then ${countersigner} countersigns.`,
         action: viewerManages ? { kind: "send" } : { kind: "none" },
       };
@@ -184,7 +184,7 @@ export function agreementView(f: AgreementFacts, viewer: Viewer, now: Date = new
         tone: needsNewLink ? "attention" : "waiting",
         headline: `Waiting on ${counterparty} to sign`,
         explanation: needsNewLink
-          ? `${counterparty} has no working signing link${linkExpired && link ? ` — it expired ${day(link.expiresAt)}` : ""}. Issue a new one to continue.`
+          ? `${counterparty} has no working signing link${linkExpired && link ? ` (it expired ${day(link.expiresAt)})` : ""}. Issue a new one to continue.`
           : `They sign first. ${countersigner} can countersign only after they have.`,
         canReissue: viewerManages,
         action: !viewerManages

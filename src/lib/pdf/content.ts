@@ -12,7 +12,7 @@ type TemplateContent = {
   clauses: Clause[];
 };
 
-// Fictional, genuinely-authored boilerplate — not copied from any real
+// Fictional, genuinely-authored boilerplate, not copied from any real
 // client template. Merge fields use Handlebars syntax and are resolved
 // at render time in src/lib/pdf/render.ts.
 export const TEMPLATE_CONTENT: Record<TemplateType, TemplateContent> = {

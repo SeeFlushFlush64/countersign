@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Outbox · Countersign" };
 
 // The demo outbox: every notification Countersign would have emailed, with
-// what happened to it. In demo mode nothing leaves the app — this page is
+// what happened to it. In demo mode nothing leaves the app, this page is
 // where the messages go.
 
 const STATUS: Record<DeliveryStatus, { icon: LucideIcon; tone: string; text: (m: OutboxMessage) => string }> = {
@@ -28,7 +28,7 @@ const STATUS: Record<DeliveryStatus, { icon: LucideIcon; tone: string; text: (m:
     tone: "text-alert",
     text: (m) => `Delivery failed after ${m.attempts} attempt${m.attempts === 1 ? "" : "s"}`,
   },
-  CANCELLED: { icon: Ban, tone: "text-slate", text: () => "Not sent" },
+  CANCELLED: { icon: Ban, tone: "text-muted", text: () => "Not sent" },
 };
 
 const needsAttention = (m: OutboxMessage) => m.status === "FAILED" || m.status === "PENDING";
@@ -43,25 +43,25 @@ function SigningLink({ link }: { link: LinkDisplay }) {
       return null;
     case "active":
       return (
-        <p className="mt-3 text-[13px] text-slate">
+        <p className="mt-3 text-[13px] text-muted">
           Signing link{" "}
-          <a href={link.path} target="_blank" rel="noreferrer" className="font-mono break-all text-signal hover:underline">
+          <a href={link.path} target="_blank" rel="noreferrer" className="font-mono break-all text-accent hover:underline">
             {link.path}
           </a>
           <span className="mt-0.5 block text-xs">
-            To act as the counterparty, open it in a private window — a browser signed in to Countersign can&rsquo;t sign
+            To act as the counterparty, open it in a private window. A browser signed in to Countersign can&rsquo;t sign
             for them.
           </span>
         </p>
       );
     case "hidden":
       return (
-        <p className="mt-3 text-xs text-slate">
+        <p className="mt-3 text-xs text-muted">
           Signing link hidden: only the agreement&rsquo;s sender or designated countersigner can see it.
         </p>
       );
     case "inactive":
-      return <p className="mt-3 text-xs text-slate">Its signing link no longer works (replaced, voided or expired).</p>;
+      return <p className="mt-3 text-xs text-muted">Its signing link no longer works (replaced, voided or expired).</p>;
     case "unreadable":
       return (
         <p className="mt-3 text-xs text-danger">The signing link can&rsquo;t be read with the current encryption key.</p>
@@ -85,11 +85,11 @@ export default async function OutboxPage({
     <div className="w-full max-w-[76rem] px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-10">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-paper lg:text-[1.75rem]">
+          <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-fg lg:text-[1.75rem]">
             Outbox
           </h1>
-          <p className="mt-2 max-w-2xl text-base text-paper">Signing links appear here, not in an inbox.</p>
-          <p className="mt-0.5 max-w-2xl text-sm text-slate">
+          <p className="mt-2 max-w-2xl text-base text-fg">Signing links appear here, not in an inbox.</p>
+          <p className="mt-0.5 max-w-2xl text-sm text-muted">
             Every notification Countersign issues is recorded here: who it is for, what it says, and what
             happened to it. Open a signing link from here to act as the counterparty.
           </p>
@@ -99,7 +99,7 @@ export default async function OutboxPage({
         )}
       </header>
 
-      <nav aria-label="Outbox views" className="mt-7 border-b border-panel-border">
+      <nav aria-label="Outbox views" className="mt-7 border-b border-rule">
         <ul className="flex">
           {[
             { href: "/outbox", label: "All", count: messages.length, active: !attentionOnly },
@@ -110,14 +110,14 @@ export default async function OutboxPage({
                 href={tab.href}
                 aria-current={tab.active ? "page" : undefined}
                 className={`relative flex h-11 items-center gap-1.5 px-3 text-sm font-medium transition-colors ${
-                  tab.active ? "text-paper" : "text-slate hover:text-paper"
+                  tab.active ? "text-fg" : "text-muted hover:text-fg"
                 }`}
               >
                 {tab.label}
-                <span className={`text-xs tabular-nums ${tab.label === "Needs attention" && tab.count > 0 ? "font-semibold text-alert" : "text-slate"}`}>
+                <span className={`text-xs tabular-nums ${tab.label === "Needs attention" && tab.count > 0 ? "font-semibold text-alert" : "text-muted"}`}>
                   {tab.count}
                 </span>
-                {tab.active && <span aria-hidden className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-signal" />}
+                {tab.active && <span aria-hidden className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-accent" />}
               </Link>
             </li>
           ))}
@@ -134,7 +134,7 @@ export default async function OutboxPage({
             : "Sending an agreement records its first message here."}
         </EmptyState>
       ) : (
-        <ol className="divide-y divide-panel-border border-b border-panel-border">
+        <ol className="divide-y divide-rule border-b border-rule">
           {shown.map((m) => {
             const status = STATUS[m.status];
             const Icon = status.icon;
@@ -144,25 +144,25 @@ export default async function OutboxPage({
               <li key={m.id} className="flex gap-3 px-4 py-4 sm:gap-4 sm:px-5">
                 <Icon aria-hidden className={`mt-0.5 size-[18px] shrink-0 ${status.tone}`} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] leading-snug font-medium break-words text-paper">
+                  <p className="text-[15px] leading-snug font-medium break-words text-fg">
                     {MESSAGE_KIND_LABELS[m.kind]}{" "}
-                    <span className="font-normal text-slate">
+                    <span className="font-normal text-muted">
                       to {m.recipientName} &lt;{m.recipientEmail}&gt;
                     </span>
                   </p>
-                  <p className="mt-0.5 text-[13px] text-slate">
-                    <Link href={`/agreements/${m.documentId}`} className="text-slate underline-offset-2 hover:text-paper hover:underline">
+                  <p className="mt-0.5 text-[13px] text-muted">
+                    <Link href={`/agreements/${m.documentId}`} className="text-muted underline-offset-2 hover:text-fg hover:underline">
                       {m.document.title}
                     </Link>
                   </p>
-                  <p className={`mt-0.5 text-[13px] ${m.status === "FAILED" ? "text-alert" : "text-slate"}`}>
+                  <p className={`mt-0.5 text-[13px] ${m.status === "FAILED" ? "text-alert" : "text-muted"}`}>
                     {status.text(m)} ·{" "}
                     <time dateTime={at.toISOString()} title={formatDateTime(at)}>
                       {formatRelative(at, now)}
                     </time>
                   </p>
                   {m.lastError && m.status !== "DELIVERED" && (
-                    <p className="mt-1 text-xs text-slate">{m.lastError}</p>
+                    <p className="mt-1 text-xs text-muted">{m.lastError}</p>
                   )}
                   {manager && (m.status === "FAILED" || m.status === "PENDING") && (
                     <div className="mt-2">
@@ -174,17 +174,17 @@ export default async function OutboxPage({
                     </div>
                   )}
                   <details className="group mt-1">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center text-[13px] text-signal hover:underline lg:min-h-8 [&::-webkit-details-marker]:hidden">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center text-[13px] text-accent hover:underline lg:min-h-8 [&::-webkit-details-marker]:hidden">
                       <span className="group-open:hidden">Show message</span>
                       <span className="hidden group-open:inline">Hide message</span>
                     </summary>
-                    <div className="border-l-2 border-panel-border pb-1 pl-4">
-                      <p className="text-sm font-medium text-paper">{m.subject}</p>
-                      <p className="mt-1.5 text-sm whitespace-pre-line text-slate">{m.body}</p>
+                    <div className="border-l-2 border-rule pb-1 pl-4">
+                      <p className="text-sm font-medium text-fg">{m.subject}</p>
+                      <p className="mt-1.5 text-sm whitespace-pre-line text-muted">{m.body}</p>
                       {m.appPath && (
-                        <p className="mt-3 text-[13px] text-slate">
+                        <p className="mt-3 text-[13px] text-muted">
                           Link in the message{" "}
-                          <Link href={m.appPath} className="font-mono break-all text-signal hover:underline">
+                          <Link href={m.appPath} className="font-mono break-all text-accent hover:underline">
                             {m.appPath}
                           </Link>
                         </p>

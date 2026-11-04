@@ -6,7 +6,7 @@ import { expectPrivateEmptyDatabase } from "./harness/private-database";
 import { type Company, makeAgreement, makeCompany } from "./helpers/agreements";
 
 // Phase E: the agreements queue. Which view an agreement is in, what its row
-// says and offers, and the order — for a given viewer.
+// says and offers, and the order, for a given viewer.
 
 const NOW = new Date("2026-03-10T12:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;

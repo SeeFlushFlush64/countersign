@@ -4,7 +4,7 @@ import type { DocumentStatus } from "@/generated/prisma/enums";
 // viewer, what to say about it, and in what order. Pure (no database), so
 // the rules are unit-tested directly.
 //
-// The views follow the signing sequence. "Needs your countersign" is the
+// The views follow the signing sequence. "Awaiting you" is the
 // only one that asks the viewer to act, and only the designated
 // countersigner ever sees an agreement there.
 
@@ -22,9 +22,9 @@ export type QueueView = (typeof QUEUE_VIEWS)[number];
 export type AgreementView = Exclude<QueueView, "all">;
 
 export const VIEW_LABELS: Record<QueueView, string> = {
-  "needs-countersign": "Needs your countersign",
-  "waiting-counterparty": "With counterparty",
-  "waiting-countersign": "With countersigner",
+  "needs-countersign": "Awaiting you",
+  "waiting-counterparty": "Awaiting counterparty",
+  "waiting-countersign": "Awaiting others",
   drafts: "Drafts",
   executed: "Executed",
   voided: "Voided",
@@ -49,13 +49,21 @@ export type QueueAgreement = {
 };
 
 export function viewOf(agreement: QueueAgreement, viewerId: string): AgreementView {
-  switch (agreement.status) {
+  return viewForStatus(agreement.status, agreement.countersignerId, viewerId);
+}
+
+export function viewForStatus(
+  status: QueueAgreement["status"],
+  countersignerId: string | null,
+  viewerId: string,
+): AgreementView {
+  switch (status) {
     case "DRAFT":
       return "drafts";
     case "SENT":
       return "waiting-counterparty";
     case "PARTIALLY_SIGNED":
-      return agreement.countersignerId === viewerId ? "needs-countersign" : "waiting-countersign";
+      return countersignerId === viewerId ? "needs-countersign" : "waiting-countersign";
     case "FULLY_EXECUTED":
       return "executed";
     case "VOIDED":
@@ -103,7 +111,7 @@ export type Detail = { text: string; at?: Date; atPrefix?: string };
 
 function linkDetail(a: QueueAgreement, now: Date): Detail & { tone: Tone } {
   const link = a.activeLink;
-  if (!link) return { tone: "attention", text: "No active signing link — reissue one" };
+  if (!link) return { tone: "attention", text: "No active signing link: reissue one" };
   if (link.expiresAt <= now) {
     return { tone: "attention", text: "Signing link expired", at: link.expiresAt };
   }
@@ -146,7 +154,7 @@ export function rowFor(a: QueueAgreement, viewerId: string, now: Date = new Date
       return {
         ...base,
         tone: "neutral",
-        headline: "Draft — not sent yet",
+        headline: "Draft: not sent yet",
         detail: { text: "Created", at: a.createdAt },
         steps: 0,
       };

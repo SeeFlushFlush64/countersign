@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 // What an anonymous visitor can reach. Two independent layers:
 //   1. the proxy matcher, which redirects signed-out requests to /login;
 //   2. every internal page, which checks the session itself before reading
-//      any data — so loosening the matcher (e.g. to make a marketing page
+//      any data, so loosening the matcher (e.g. to make a marketing page
 //      public) cannot expose agreement data or activity.
 
 const redirect = vi.hoisted(() =>

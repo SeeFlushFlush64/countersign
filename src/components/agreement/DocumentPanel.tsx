@@ -53,10 +53,10 @@ export function DocumentPanel({
     <section aria-labelledby="document-heading" className="min-w-0">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-64">
-          <h2 id="document-heading" className="text-sm font-medium text-paper">
-            Document · <span className="text-slate">{copy.name}</span>
+          <h2 id="document-heading" className="text-sm font-medium text-fg">
+            Document · <span className="text-muted">{copy.name}</span>
           </h2>
-          <p className="mt-0.5 text-[13px] text-slate">{copy.note}</p>
+          <p className="mt-0.5 text-[13px] text-muted">{copy.note}</p>
         </div>
         {ready && (
           // Larger screens only; phones get the document link below.
@@ -76,39 +76,39 @@ export function DocumentPanel({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className={`mt-3 flex items-center gap-3 rounded-md border border-panel-border px-4 py-3 transition-colors hover:border-panel-border-hover ${large ? "lg:hidden" : "md:hidden"}`}
+            className={`mt-3 flex items-center gap-3 rounded-md border border-rule px-4 py-3 transition-colors hover:border-rule-strong ${large ? "lg:hidden" : "md:hidden"}`}
           >
-            <FileText aria-hidden className="size-5 shrink-0 text-slate" />
+            <FileText aria-hidden className="size-5 shrink-0 text-muted" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-paper">{title}</span>
-              <span className="block text-xs text-slate">PDF · {copy.name}</span>
+              <span className="block truncate text-sm font-medium text-fg">{title}</span>
+              <span className="block text-xs text-muted">PDF · {copy.name}</span>
             </span>
-            <ExternalLink aria-hidden className="size-4 shrink-0 text-slate" />
+            <ExternalLink aria-hidden className="size-4 shrink-0 text-muted" />
           </a>
           {/* Larger screens: inline */}
           <iframe
             src={href}
-            title={`${title} — ${copy.name}`}
-            className={`mt-3 hidden h-[min(78vh,56rem)] w-full rounded-md border border-panel-border bg-panel ${large ? "lg:block" : "md:block"}`}
+            title={`${title} · ${copy.name}`}
+            className={`mt-3 hidden h-[min(78vh,56rem)] w-full rounded-md border border-rule bg-surface ${large ? "lg:block" : "md:block"}`}
           />
         </>
       ) : (
-        <div className="mt-3 flex items-start gap-3 rounded-md border border-panel-border px-4 py-4 text-sm">
+        <div className="mt-3 flex items-start gap-3 rounded-md border border-rule px-4 py-4 text-sm">
           <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-alert" />
           <div>
             {!artifact ? (
-              <p className="text-paper">No PDF is stored for this agreement.</p>
+              <p className="text-fg">No PDF is stored for this agreement.</p>
             ) : (
               <>
-                <p className="text-paper">
+                <p className="text-fg">
                   {artifact.status === "FAILED"
                     ? `The PDF could not be generated${artifact.attempts > 0 ? ` (${artifact.attempts} attempt${artifact.attempts === 1 ? "" : "s"})` : ""}.`
                     : "The PDF is being generated."}
                 </p>
-                <p className="mt-0.5 text-slate">
+                <p className="mt-0.5 text-muted">
                   Nothing about the agreement is affected. Opening it tries again.
                 </p>
-                {artifact.lastError && <p className="mt-1 text-xs text-slate">{artifact.lastError}</p>}
+                {artifact.lastError && <p className="mt-1 text-xs text-muted">{artifact.lastError}</p>}
                 <a href={href} target="_blank" rel="noreferrer" className={buttonClasses("secondary", "sm", "mt-3")}>
                   Try opening the PDF
                 </a>

@@ -15,22 +15,22 @@ export default async function PreparingDemoPage() {
   await requireUser();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="border-b border-panel-border">
+      <header className="border-b border-rule">
         <div className="mx-auto flex h-14 w-full max-w-[72rem] items-center gap-2.5 px-4 sm:px-6 lg:px-10">
           <span aria-hidden>
-            <CountersignMark className="size-6 text-signal" />
+            <CountersignMark className="size-6 text-accent" />
           </span>
-          <span className="font-[family-name:var(--font-display)] text-[15px] font-semibold tracking-tight text-paper">
+          <span className="font-[family-name:var(--font-display)] text-[15px] font-semibold tracking-tight text-fg">
             Countersign
           </span>
         </div>
       </header>
       <main id="main" className="flex flex-1 justify-center px-4 py-12 sm:py-20">
         <div className="w-full max-w-md">
-          <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-paper">
+          <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-fg">
             Preparing a fresh workspace
           </h1>
-          <p className="mt-2 text-sm text-slate">
+          <p className="mt-2 text-sm text-muted">
             The shared sample workspace starts fresh after a period of inactivity, so its sample agreements are
             being set up again. This takes up to half a minute. Earlier sessions are kept, not deleted, but no longer appear.
           </p>

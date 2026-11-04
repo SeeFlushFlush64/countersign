@@ -7,7 +7,7 @@ import { type Company, makeAgreement, makeCompany } from "./helpers/agreements";
 
 // Phase E: the counterparty's signing room shows the agreement's display
 // facts only for a working link, and never anything for a link that cannot
-// be used — whatever state the agreement is in.
+// be used, whatever state the agreement is in.
 
 let company: Company;
 

@@ -6,7 +6,7 @@ import type { AgreementView } from "@/lib/queue";
 //
 // The three steps sit in three equal columns, dots joined by a line. On wide
 // screens the labels appear once, in the queue's header row; elsewhere each
-// row labels its own steps under the dots — in the past tense once done
+// row labels its own steps under the dots, in the past tense once done
 // ("Sent", "Counterparty signed"), so the labels read as the row's status.
 
 export const STEP_NAMES = ["Send", "Counterparty signs", "Countersign"] as const;
@@ -31,10 +31,10 @@ const NEXT_DOT: Partial<Record<AgreementView, string>> = {
 };
 
 const NEXT_LABEL: Partial<Record<AgreementView, string>> = {
-  "needs-countersign": "text-signal",
+  "needs-countersign": "text-accent",
   "waiting-countersign": "text-state-waiting",
   "waiting-counterparty": "text-state-waiting",
-  drafts: "text-paper",
+  drafts: "text-fg",
 };
 
 function stateOf(index: number, steps: number, view: AgreementView): StepState {
@@ -45,7 +45,7 @@ function stateOf(index: number, steps: number, view: AgreementView): StepState {
 
 const SPOKEN: Record<StepState, string> = { done: "done", next: "next", ahead: "not reached" };
 
-const line = (done: boolean) => (done ? "bg-slate-dim" : "bg-panel-border");
+const line = (done: boolean) => (done ? "bg-faint" : "bg-rule");
 
 export function SequenceSteps({
   view,
@@ -75,8 +75,8 @@ export function SequenceSteps({
                   state === "done"
                     ? DONE_DOT[view]
                     : state === "next"
-                      ? `bg-ink ring-[1.5px] ring-inset ${NEXT_DOT[view] ?? "ring-slate-dim"}`
-                      : "bg-ink ring-1 ring-inset ring-slate-dim"
+                      ? `bg-canvas ring-[1.5px] ring-inset ${NEXT_DOT[view] ?? "ring-faint"}`
+                      : "bg-canvas ring-1 ring-inset ring-faint"
                 }`}
               />
             </div>
@@ -84,7 +84,7 @@ export function SequenceSteps({
               className={
                 labelled
                   ? `px-1 text-center text-xs leading-tight ${
-                      state === "next" ? `font-medium ${NEXT_LABEL[view] ?? "text-paper"}` : "text-slate"
+                      state === "next" ? `font-medium ${NEXT_LABEL[view] ?? "text-fg"}` : "text-muted"
                     }`
                   : "sr-only"
               }
@@ -102,7 +102,7 @@ export function SequenceSteps({
 // Step names for the shared header, aligned with the three columns.
 export function SequenceHeader() {
   return (
-    <div aria-hidden className="grid grid-cols-3 text-center text-xs text-slate">
+    <div aria-hidden className="grid grid-cols-3 text-center text-xs text-muted">
       {STEP_NAMES.map((name) => (
         <span key={name}>{name}</span>
       ))}

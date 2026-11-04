@@ -78,7 +78,7 @@ export { DocumentFlowError, type FlowErrorCode } from "@/lib/errors";
 // and the countersign can only observe that commit before taking its own.
 export type Clock = { now?: Date };
 
-// An authenticated company user, as established by the session — never by
+// An authenticated company user, as established by the session, never by
 // anything the client sends.
 export type Actor = { userId: string };
 
@@ -445,7 +445,7 @@ export async function sendDocument(
 // agreement has none). Only one request can replace a given link, so a
 // double-click or concurrent reissues produce exactly one new link and one
 // LINK_REISSUED event; every other request fails with a clean conflict
-// (the winner's token cannot be handed out again — only its hash exists).
+// (the winner's token cannot be handed out again, only its hash exists).
 
 export const REISSUE_CONFLICT_MESSAGE =
   "This signing link was already reissued. Use the newest link, or reload and reissue again.";
@@ -723,7 +723,7 @@ function linkErrorFor(view: Exclude<LinkView, { state: "valid" }>): DocumentFlow
 }
 
 // ---------------------------------------------------------------------------
-// Views: recorded on the server when a valid link's page is served — once per
+// Views: recorded on the server when a valid link's page is served, once per
 // link, never from a client-callable action
 
 export async function recordLinkView(
@@ -1086,7 +1086,7 @@ export async function generateExecutedArtifact(
 // every other query). Company users (signed in) see the executed PDF if READY,
 // otherwise the frozen copy; an agreement that was never sent shows its draft
 // preview. A link holder sees only their own agreement, and only what was
-// sent to them (frozen) or the executed copy — never a preview. A derived PDF
+// sent to them (frozen) or the executed copy, never a preview. A derived PDF
 // that is not READY gets another (idempotent) generation attempt first, and
 // is reported as pending rather than replaced by an older copy.
 

@@ -136,7 +136,7 @@ export function getCountersignView(id: string) {
 
 // The counterparty's signing room. The link itself is validated by
 // resolveSigningLink (src/lib/documents.ts); only for a valid link are the
-// agreement's display facts loaded — the same people, dates and fingerprints
+// agreement's display facts loaded, the same people, dates and fingerprints
 // the PDF itself shows, never anything about other agreements.
 export async function getSigningRoom(token: string, now: Date = new Date()) {
   const link = await resolveSigningLink(token, now);

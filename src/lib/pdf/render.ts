@@ -99,7 +99,7 @@ export async function renderHtmlToPdf(
     // A blocked navigation (e.g. a meta refresh) replaces the document with
     // an error page and would otherwise print a blank PDF without failing.
     // Checked before and after printing, since a navigation can land while
-    // the PDF is being generated — in which case Chromium may instead abort
+    // the PDF is being generated, in which case Chromium may instead abort
     // the print with a protocol error; that is classified the same way.
     let navigated = false;
     page.on("framenavigated", (frame) => {

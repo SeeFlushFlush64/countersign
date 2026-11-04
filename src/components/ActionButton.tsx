@@ -28,7 +28,7 @@ export function ActionButton({
       </button>
       <span role="status" className="text-xs">
         {state.error && <span className="text-danger">{state.error}</span>}
-        {state.result && <span className="text-slate">{state.result}</span>}
+        {state.result && <span className="text-muted">{state.result}</span>}
       </span>
     </form>
   );

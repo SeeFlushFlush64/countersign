@@ -11,9 +11,9 @@ import {
 import { signingPath } from "@/lib/signing-links";
 
 // Send and reissue return the counterparty's new signing link. Afterwards it
-// exists only as a hash on the link and, sealed, in the outbox — from which
+// exists only as a hash on the link and, sealed, in the outbox, from which
 // the agreement page offers it to the sender and countersigner while it
-// works. Every action verifies the session itself — a Server Action is its
+// works. Every action verifies the session itself, a Server Action is its
 // own entry point and can be invoked directly.
 
 export type LinkState = { error: string | null; signingPath: string | null };

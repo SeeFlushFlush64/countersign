@@ -18,7 +18,7 @@ Built by [Michael Palaganas](https://michaelrhey.com) as a standalone version of
 
 A sender can also **void** an agreement or **reissue** the signing link, which kills the old one. Every step is written to an append-only history, shown at `/audit`.
 
-States: `DRAFT`, `AWAITING_COUNTERPARTY`, `AWAITING_COUNTERSIGNATURE`, `EXECUTED`, `VOIDED`.
+States: `DRAFT`, `SENT` (awaiting the counterparty), `PARTIALLY_SIGNED` (awaiting countersignature), `FULLY_EXECUTED` and `VOIDED`.
 
 Notifications are recorded in an in-app outbox instead of an inbox. Open a signing link from the outbox to act as the counterparty. Countersign has no email, Google Drive or webhook integration.
 

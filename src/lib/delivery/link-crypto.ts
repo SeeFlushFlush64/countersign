@@ -16,7 +16,7 @@ import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } f
 //
 // Key: OUTBOX_ENCRYPTION_KEY, at least 32 characters, required in production
 // (fail closed, like AUDIT_IP_HMAC_KEY). Development and tests fall back to a
-// fixed, public development key — never secret, never valid in production.
+// fixed, public development key, never secret, never valid in production.
 
 export class MissingOutboxKeyError extends Error {
   constructor(message: string) {

@@ -14,7 +14,7 @@ export type EpochState = {
 };
 
 // findFirst, not findUnique: Prisma batches concurrent findUnique calls into
-// one `IN` query, which a Boolean column does not support — so two requests
+// one `IN` query, which a Boolean column does not support, so two requests
 // at once would fail. The marker is still unique, so this finds at most one.
 export function currentEpoch(): Promise<EpochState | null> {
   return prisma.demoEpoch.findFirst({

@@ -19,16 +19,16 @@ const TEMPLATE_SUMMARIES: Record<TemplateType, string> = {
 };
 
 const INPUT =
-  "h-11 w-full rounded-md border border-panel-border bg-ink px-3 text-base text-paper placeholder:text-slate focus:border-signal focus:outline-none lg:h-10 lg:text-sm";
+  "h-11 w-full rounded-md border border-rule bg-canvas px-3 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none lg:h-10 lg:text-sm";
 
 const initialState: CreateDocumentState = { error: null };
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <fieldset className="min-w-0 border-t border-panel-border pt-6 first-of-type:border-t-0 first-of-type:pt-0">
-      <legend className="float-left w-full text-sm font-medium text-paper">{title}</legend>
+    <fieldset className="min-w-0 border-t border-rule pt-6 first-of-type:border-t-0 first-of-type:pt-0">
+      <legend className="float-left w-full text-sm font-medium text-fg">{title}</legend>
       <div className="clear-left flex flex-col gap-3 pt-0.5">
-        {hint && <p className="text-[13px] text-slate">{hint}</p>}
+        {hint && <p className="text-[13px] text-muted">{hint}</p>}
         {children}
       </div>
     </fieldset>
@@ -59,18 +59,18 @@ export function CreateForm({
           {Object.values(TemplateType).map((type, i) => (
             <label
               key={type}
-              className="flex cursor-pointer items-start gap-3 rounded-md border border-panel-border px-3.5 py-3 transition-colors hover:border-panel-border-hover has-[:checked]:border-signal has-[:checked]:bg-panel has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal"
+              className="flex cursor-pointer items-start gap-3 rounded-md border border-rule px-3.5 py-3 transition-colors hover:border-rule-strong has-[:checked]:border-accent has-[:checked]:bg-surface has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent"
             >
               <input
                 type="radio"
                 name="templateType"
                 value={type}
                 defaultChecked={i === 0}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--color-signal)] focus-visible:outline-none"
+                className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent)] focus-visible:outline-none"
               />
               <span>
-                <span className="block text-sm font-medium text-paper">{TEMPLATE_TYPE_LABELS[type]}</span>
-                <span className="block text-[13px] text-slate">{TEMPLATE_SUMMARIES[type]}</span>
+                <span className="block text-sm font-medium text-fg">{TEMPLATE_TYPE_LABELS[type]}</span>
+                <span className="block text-[13px] text-muted">{TEMPLATE_SUMMARIES[type]}</span>
               </span>
             </label>
           ))}
@@ -79,7 +79,7 @@ export function CreateForm({
 
       <Section title="Counterparty" hint="Signs first, through a private link. They don’t need an account.">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] text-slate">Name</span>
+          <span className="text-[13px] text-muted">Name</span>
           <input
             name="counterpartyName"
             required
@@ -91,7 +91,7 @@ export function CreateForm({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] text-slate">Email</span>
+          <span className="text-[13px] text-muted">Email</span>
           <input
             name="counterpartyEmail"
             type="email"
@@ -102,7 +102,7 @@ export function CreateForm({
             className={INPUT}
           />
           {exampleDomainsOnly && (
-            <span id="email-hint" className="text-xs text-slate">
+            <span id="email-hint" className="text-xs text-muted">
               The sample workspace sends no email. Use an address ending in .example or .test, or at example.com.
             </span>
           )}
@@ -123,21 +123,21 @@ export function CreateForm({
             {countersigners.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
-                {c.you ? " (you)" : ""} — {c.role}
+                {c.you ? " (you)" : ""} · {c.role}
               </option>
             ))}
           </select>
         )}
       </Section>
 
-      <Section title="Title" hint="Optional. Left empty, it becomes “Template — Counterparty”.">
-        <input name="title" maxLength={LIMITS.title} placeholder="e.g. Mutual NDA — Ashgrove Creative LLC" className={INPUT} />
+      <Section title="Title" hint="Optional. Left empty, it becomes “Template with Counterparty”.">
+        <input name="title" maxLength={LIMITS.title} placeholder="e.g. Mutual NDA with Ashgrove Creative LLC" className={INPUT} />
       </Section>
 
-      <div className="flex flex-col gap-4 border-t border-panel-border pt-6">
-        <p className="text-sm text-slate">
-          Order once sent: <span className="text-paper">{counterparty.trim() || "the counterparty"}</span> signs first,
-          then <span className="text-paper">{countersigner?.name ?? "the countersigner"}</span> countersigns. Prepared
+      <div className="flex flex-col gap-4 border-t border-rule pt-6">
+        <p className="text-sm text-muted">
+          Order once sent: <span className="text-fg">{counterparty.trim() || "the counterparty"}</span> signs first,
+          then <span className="text-fg">{countersigner?.name ?? "the countersigner"}</span> countersigns. Prepared
           by {preparedBy}.
         </p>
         {state.error && (

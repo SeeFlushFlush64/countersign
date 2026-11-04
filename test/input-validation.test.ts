@@ -104,7 +104,7 @@ describe("createDocumentAction", () => {
       where: { counterpartyName: "Trim Me Ltd" },
       include: { statusEvents: true },
     });
-    expect(row.title).toBe("Mutual NDA — Trim Me Ltd");
+    expect(row.title).toBe("Mutual NDA with Trim Me Ltd");
     expect(row.statusEvents[0]).toMatchObject({
       eventType: "CREATED",
       actorType: "USER",

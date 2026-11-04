@@ -10,7 +10,7 @@ import { seed } from "../../../prisma/seed-lib";
 //
 //   1. due?    demo mode is on, and the current epoch is not a demo epoch
 //              (a fresh deployment), or it has been used and then left idle;
-//   2. claim   insert a PREPARING epoch — the unique marker admits one at a
+//   2. claim   insert a PREPARING epoch, the unique marker admits one at a
 //              time, so concurrent visitors cannot start two resets; a claim
 //              whose lease ran out (a crashed reset) is abandoned first;
 //   3. seed    the demo agreements, through the real lifecycle, into it;

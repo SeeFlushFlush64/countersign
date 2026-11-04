@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ArtifactKind, DocumentStatus, PartyRole } from "@/generated/prisma/enums";
 import {
   DEMO_LOGIN_EMAIL,
-  DEMO_LOGIN_PASSWORD,
+  RETIRED_SAMPLE_PASSWORD,
   DEMO_USERS,
   SCHEDULE,
   SEED_DOCUMENTS,
@@ -79,7 +79,7 @@ describe("seed", () => {
     for (const demo of DEMO_USERS) {
       const user = await prisma.user.findUniqueOrThrow({ where: { email: demo.email } });
       expect(user.isSignatory).toBe(demo.isSignatory);
-      expect(await bcrypt.compare(DEMO_LOGIN_PASSWORD, user.passwordHash)).toBe(true);
+      expect(await bcrypt.compare(RETIRED_SAMPLE_PASSWORD, user.passwordHash)).toBe(false);
     }
     const signatory = await prisma.user.findUniqueOrThrow({ where: { email: DEMO_LOGIN_EMAIL } });
 

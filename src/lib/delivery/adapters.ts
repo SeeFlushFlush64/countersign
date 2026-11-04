@@ -1,7 +1,7 @@
 import { DeliveryChannel } from "@/generated/prisma/enums";
 
 // How a message leaves Countersign. The outbox (outbox.ts) owns everything
-// stateful — claiming, attempts, retries, recording the outcome — so an
+// stateful, claiming, attempts, retries, recording the outcome, so an
 // adapter only has to hand one message to its channel, or throw.
 //
 // Only one adapter exists: the demo outbox, which sends nothing. A real
@@ -43,8 +43,8 @@ export const DELIVERY_MODES = ["demo-outbox"] as const;
 
 // DELIVERY_MODE selects the adapter. Outside production it defaults to the
 // demo outbox; production must choose explicitly, so a deployment can never
-// silently "deliver" into a demo outbox without saying so. Any other value —
-// including the name of an email provider — is refused: no production email
+// silently "deliver" into a demo outbox without saying so. Any other value -
+// including the name of an email provider, is refused: no production email
 // integration exists. Provider credentials in the environment are never read
 // and enable nothing.
 export function deliveryAdapter(env: NodeJS.ProcessEnv = process.env): DeliveryAdapter {

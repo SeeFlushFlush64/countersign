@@ -1,4 +1,4 @@
-// Countersign demo — data model
+// Countersign demo, data model
 // Adjusted from the source spec for Prisma/Next.js convention:
 //   - camelCase fields (Prisma convention) instead of snake_case
 //   - free-text `status` / `template_type` / `party_role` / `event_type` columns
@@ -34,11 +34,11 @@ enum TemplateType {
 
 // Agreement lifecycle. The stored values predate the product's state names
 // and are kept for compatibility (migrations are additive only):
-//   DRAFT            — editable, nothing sent
-//   SENT             — awaiting the counterparty (frozen PDF + hash exist)
-//   PARTIALLY_SIGNED — awaiting the company countersignature
-//   FULLY_EXECUTED   — executed (terminal)
-//   VOIDED           — voided by the company before execution (terminal)
+//   DRAFT           , editable, nothing sent
+//   SENT            , awaiting the counterparty (frozen PDF + hash exist)
+//   PARTIALLY_SIGNED, awaiting the company countersignature
+//   FULLY_EXECUTED  , executed (terminal)
+//   VOIDED          , voided by the company before execution (terminal)
 // The database enforces that the status agrees with the signing timestamps
 // and void metadata, that the countersignature never precedes the
 // counterparty's signature, and that terminal statuses never change (CHECK

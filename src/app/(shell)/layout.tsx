@@ -12,7 +12,7 @@ import { AppNav } from "@/components/shell/AppNav";
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requireUser();
   // Demo mode: a demo that was used and then left idle starts fresh before
-  // anyone sees it (src/lib/demo/epochs.ts) — unless a reset just failed, when
+  // anyone sees it (src/lib/demo/epochs.ts), unless a reset just failed, when
   // the current demo is used as it is for a while.
   const demo = demoSettings();
   if (demo.enabled) {
@@ -32,7 +32,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
     <div className="min-h-dvh w-full lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
       <a
         href="#main"
-        className="sr-only z-50 rounded-md bg-signal px-4 py-2 text-sm font-medium text-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-md bg-accent px-4 py-2 text-sm font-medium text-canvas focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
         Skip to content
       </a>

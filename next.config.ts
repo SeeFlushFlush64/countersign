@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium",
   ],
   // On Vercel, @sparticuz/chromium unpacks Chromium from the brotli archives
-  // in its bin/ directory, which it finds at runtime by path — file tracing
+  // in its bin/ directory, which it finds at runtime by path, file tracing
   // cannot see that, so without this no function would ship the browser and
   // every PDF render would fail. All routes: any server code may render.
   outputFileTracingIncludes: {
@@ -15,12 +15,12 @@ const nextConfig: NextConfig = {
   },
   // The default bottom-left position sits directly on top of the sidebar's
   // bottom controls (identity block, log out) and physically blocks clicks
-  // in dev mode — move it out of the sidebar's way.
+  // in dev mode, move it out of the sidebar's way.
   devIndicators: {
     position: "bottom-right",
   },
-  // The agreement pages moved under /agreements (Phase E). Old links —
-  // including those in messages already in the outbox — keep working.
+  // The agreement pages moved under /agreements (Phase E). Old links -
+  // including those in messages already in the outbox, keep working.
   async redirects() {
     return [
       { source: "/documents/:id", destination: "/agreements/:id", permanent: true },

@@ -18,7 +18,7 @@ import {
   stateOf,
 } from "./helpers/agreements";
 
-// Audit finding (High): concurrent submissions all "succeeded" — three
+// Audit finding (High): concurrent submissions all "succeeded", three
 // countersigns produced three FULLY_EXECUTED events. Each transition is now a
 // conditional update inside a transaction, so exactly one attempt wins and
 // the rest fail cleanly with a DocumentFlowError (never a raw DB error).

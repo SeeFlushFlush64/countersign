@@ -63,7 +63,7 @@ export function PrimaryAction({
       return (
         <a href={action.href} target="_blank" rel="noreferrer" className={buttonClasses("secondary", "md", "w-full md:w-auto")}>
           <LoaderCircle aria-hidden />
-          Executed PDF is being prepared — try opening it
+          Executed PDF is being prepared. Try opening it
         </a>
       );
     case "none":
@@ -161,18 +161,18 @@ export function MoreActions({
         >
           <Ellipsis aria-hidden />
         </summary>
-        <div className="absolute right-0 z-30 mt-1 w-64 rounded-md border border-panel-border bg-panel p-1 shadow-xl shadow-black/40">
+        <div className="absolute right-0 z-30 mt-1 w-64 rounded-md border border-rule bg-surface p-1 shadow-xl shadow-black/40">
           {canReissue && (
             <form action={reissueForm} onSubmit={() => menu.current?.removeAttribute("open")}>
               <button
                 type="submit"
                 disabled={reissuing}
-                className="flex w-full items-start gap-3 rounded px-3 py-2.5 text-left text-sm text-paper hover:bg-panel-hover"
+                className="flex w-full items-start gap-3 rounded px-3 py-2.5 text-left text-sm text-fg hover:bg-surface-hover"
               >
-                <RefreshCw aria-hidden className="mt-0.5 size-4 shrink-0 text-slate" />
+                <RefreshCw aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
                 <span>
                   Reissue signing link
-                  <span className="block text-xs text-slate">
+                  <span className="block text-xs text-muted">
                     Gives {counterpartyName} a new link; the current one stops working.
                   </span>
                 </span>
@@ -191,7 +191,7 @@ export function MoreActions({
               <Ban aria-hidden className="mt-0.5 size-4 shrink-0" />
               <span>
                 Void agreement…
-                <span className="block text-xs text-slate">Stops it permanently; needs a reason.</span>
+                <span className="block text-xs text-muted">Stops it permanently; needs a reason.</span>
               </span>
             </button>
           )}
@@ -203,7 +203,7 @@ export function MoreActions({
         </p>
       )}
       {reissueState.signingPath && !reissueState.error && (
-        <p role="status" className="text-sm text-slate">
+        <p role="status" className="text-sm text-muted">
           New link issued. The previous link no longer works.
         </p>
       )}
@@ -211,20 +211,20 @@ export function MoreActions({
       <dialog
         ref={dialog}
         aria-labelledby="void-title"
-        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-panel-border bg-panel p-0 text-paper backdrop:bg-black/60"
+        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-rule bg-surface p-0 text-fg backdrop:bg-black/60"
       >
         <form action={voidForm} className="flex flex-col gap-4 p-5">
           <div>
-            <h2 id="void-title" className="text-base font-semibold text-paper">
+            <h2 id="void-title" className="text-base font-semibold text-fg">
               Void this agreement?
             </h2>
-            <p className="mt-1 text-sm text-slate">
+            <p className="mt-1 text-sm text-muted">
               Voiding is permanent. {counterpartyName}&rsquo;s signing link stops working at once,
               nobody can sign it any more, and the reason is recorded in the history.
             </p>
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-paper">Reason</span>
+            <span className="text-sm font-medium text-fg">Reason</span>
             <textarea
               name="reason"
               required
@@ -232,7 +232,7 @@ export function MoreActions({
               maxLength={LIMITS.voidReason}
               rows={3}
               autoFocus
-              className="rounded-md border border-panel-border bg-ink px-3 py-2 text-base text-paper placeholder:text-slate focus:border-signal focus:outline-none lg:text-sm"
+              className="rounded-md border border-rule bg-canvas px-3 py-2 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none lg:text-sm"
               placeholder="e.g. The counterparty's legal name was wrong"
             />
           </label>

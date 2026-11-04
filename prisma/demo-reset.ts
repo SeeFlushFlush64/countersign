@@ -4,7 +4,7 @@ import { describeDatabaseTarget } from "../src/lib/database-target";
 import { closeRenderer } from "../src/lib/pdf/render";
 import { resetDemoNow } from "../src/lib/demo/reset-now";
 
-// `npm run demo:reset`: start the public demo fresh now — a new demo epoch,
+// `npm run demo:reset`: start the public demo fresh now, a new demo epoch,
 // seeded and made current, the previous epoch retired (nothing is deleted).
 // Used once after deploying, instead of `npm run seed`; afterwards the app
 // resets itself lazily (src/lib/demo/epochs.ts).

@@ -1,5 +1,5 @@
 // Demo mode (DEMO_MODE=1, for the public demo deployment): the shared demo
-// starts fresh — a new epoch, reseeded — once it has been used and then left
+// starts fresh, a new epoch, reseeded, once it has been used and then left
 // idle, and every new epoch carries limits so one visitor cannot fill it.
 // Off by default (local development, tests, any non-demo deployment).
 

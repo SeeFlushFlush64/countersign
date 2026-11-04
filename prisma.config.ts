@@ -2,7 +2,7 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 // This config is read only by the Prisma CLI (migrate, studio, db, …), never
-// by the running app — the app connects through the pg driver adapter in
+// by the running app, the app connects through the pg driver adapter in
 // src/lib/prisma.ts using the pooled DATABASE_URL.
 //
 // Prisma 7's datasource config has no `directUrl` field, so the CLI gets the

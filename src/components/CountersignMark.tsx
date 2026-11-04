@@ -1,6 +1,6 @@
 // Inline render of the "2a Nest" mark (see the brand asset kit's README
 // for construction/colour rules). Uses currentColor so it inherits
-// text color from its parent — pass text-signal for the standard
+// text color from its parent, pass text-accent for the standard
 // violet-on-dark treatment.
 export function CountersignMark({ className }: { className?: string }) {
   return (

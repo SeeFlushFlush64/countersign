@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { hashIp } from "@/lib/hash";
 
 // Audit context for counterparty actions, read on the server from the
-// request — never from anything the client chooses to send.
+// request, never from anything the client chooses to send.
 //
 // Privacy: a raw IP address is never stored. It is reduced to an HMAC keyed
 // with AUDIT_IP_HMAC_KEY (an unkeyed hash of an IPv4 address is trivially

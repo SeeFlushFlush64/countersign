@@ -75,11 +75,11 @@ export const SignaturePad = forwardRef<SignaturePadHandle, {
     <div className="relative">
       <canvas
         ref={canvasRef}
-        className="h-40 w-full touch-none rounded-md border border-panel-border bg-paper"
+        className="h-40 w-full touch-none rounded-md border border-rule bg-white"
       />
-      <div className="pointer-events-none absolute inset-x-4 bottom-3 border-t border-slate-dim/40" />
+      <div className="pointer-events-none absolute inset-x-4 bottom-3 border-t border-faint/40" />
       {empty && (
-        <span className="pointer-events-none absolute bottom-5 left-4 text-sm text-ink/45">Sign here</span>
+        <span className="pointer-events-none absolute bottom-5 left-4 text-sm text-muted">Sign here</span>
       )}
     </div>
   );

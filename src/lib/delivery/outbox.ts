@@ -14,7 +14,7 @@ import { decryptLinkToken, encryptLinkToken } from "./link-crypto";
 //   2. After commit, each message is delivered (deliverMessage): claimed with
 //      a conditional update and a lease, handed to the adapter, and its
 //      outcome recorded. Delivery never touches the agreement, so a failure
-//      can only ever leave a FAILED message behind — never a half-done step.
+//      can only ever leave a FAILED message behind, never a half-done step.
 //   3. FAILED messages are retried: automatically by dispatchDueMessages (up
 //      to MAX_AUTOMATIC_ATTEMPTS), and on demand by a company user
 //      (retryDelivery). A SENDING message whose lease expired (a crashed
