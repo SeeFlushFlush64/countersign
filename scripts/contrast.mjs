@@ -31,6 +31,14 @@ const pairs = [
   ["muted", "canvas-sunken", 4.5], ["accent", "surface", 4.5], ["accent", "canvas", 4.5],
   ["canvas", "accent", 4.5], ["canvas", "accent-strong", 4.5], ["danger", "surface", 4.5],
   ["live", "surface", 4.5], ["alert", "surface", 4.5], ["faint", "surface", 3],
+  // Gold (status) as text, and its fill as a graphic (markers, rings: 3 for UI).
+  ["gold", "surface", 4.5], ["gold", "canvas", 4.5], ["gold", "canvas-sunken", 4.5], ["gold", "gold-soft", 4.5],
+  ["gold-fill", "surface", 3], ["gold-fill", "gold-soft", 3], ["gold-fill", "canvas-sunken", 3],
+  // The deep blue closing band: body and muted text on it.
+  ["canvas", "ink-band", 4.5], ["on-ink-muted", "ink-band", 4.5],
+  ["fg", "surface", 4.5], ["accent", "accent-soft", 4.5], ["muted", "accent-soft", 4.5],
+  // Focus ring (accent) against the grounds it sits on, a UI component pair.
+  ["accent", "canvas", 3], ["accent", "canvas-sunken", 3],
 ];
 let failed = 0;
 const report = (label, value, min) => {

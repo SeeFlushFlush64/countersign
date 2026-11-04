@@ -32,7 +32,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
     <div className="min-h-dvh w-full lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
       <a
         href="#main"
-        className="sr-only z-50 rounded-md bg-accent px-4 py-2 text-sm font-medium text-canvas focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-md bg-accent px-4 py-2 text-sm font-medium text-canvas focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:px-4 focus:py-2.5"
       >
         Skip to content
       </a>

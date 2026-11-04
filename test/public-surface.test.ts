@@ -52,7 +52,20 @@ describe("proxy matcher", () => {
     expect(matcher.test(path)).toBe(true);
   });
 
-  it.each(["/", "/s/sometoken", "/s/sometoken/document", "/login", "/api/auth/session", "/icon.svg", "/robots.txt"])(
+  it.each([
+    "/",
+    "/s/sometoken",
+    "/s/sometoken/document",
+    "/login",
+    "/api/auth/session",
+    "/icon.svg",
+    "/robots.txt",
+    // The landing page's screenshots: without this a signed-out visitor sees broken images.
+    "/product/dashboard.png",
+    "/product/phone-signing.png",
+    "/product/executed-pdf.png",
+    "/product/audit-log.png",
+  ])(
     "leaves %s public",
     (path) => {
       expect(matcher.test(path)).toBe(false);

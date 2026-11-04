@@ -31,11 +31,19 @@
   --color-accent-soft: #e6ebf8;
   --color-live: #14744a;
   --color-alert: #8f5400;
+  /* Warm gold, used only for status: an agreement waiting on someone. `gold` is
+     text; `gold-fill` is for markers and rings (graphics, not text); `gold-soft`
+     is its tint. `ink-band` is the deep blue closing band. */
+  --color-gold: #8a6100;
+  --color-gold-fill: #a67b10;
+  --color-gold-soft: #f6edd6;
+  --color-ink-band: #142a69;
+  --color-on-ink-muted: #c9d3ee;
   --color-danger: #b3262d;
 
   /* Lifecycle states */
   --color-state-draft: #566677;
-  --color-state-waiting: #8f5400;
+  --color-state-waiting: #8a6100;
   --color-state-action: #1d3a8a;
   --color-state-done: #14744a;
   --color-state-void: #b3262d;
@@ -102,15 +110,4 @@ body {
   background-size: 8px 1px;
   background-repeat: repeat-x;
   background-position: bottom;
-}
-
-/* Fine ruled paper, used once, behind the landing page product frame. */
-.ruled {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 27px,
-    var(--color-rule) 27px,
-    var(--color-rule) 28px
-  );
 }
