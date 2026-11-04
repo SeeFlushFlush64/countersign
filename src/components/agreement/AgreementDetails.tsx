@@ -14,8 +14,8 @@ import { ActionButton } from "@/components/ActionButton";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-panel-border py-5 first:border-t-0 first:pt-0">
-      <h2 className="mb-3 text-sm font-medium text-paper">{title}</h2>
+    <section className="border-t border-rule py-5 first:border-t-0 first:pt-0">
+      <h2 className="mb-3 text-sm font-medium text-fg">{title}</h2>
       {children}
     </section>
   );
@@ -33,11 +33,11 @@ function Collapsible({
   children: React.ReactNode;
 }) {
   return (
-    <details open={open} className="group border-t border-panel-border py-1.5 lg:py-3">
+    <details open={open} className="group border-t border-rule py-1.5 lg:py-3">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm lg:min-h-8 [&::-webkit-details-marker]:hidden">
-        <ChevronRight aria-hidden className="size-4 shrink-0 text-slate transition-transform group-open:rotate-90" />
-        <span className="text-sm font-medium text-paper">{title}</span>
-        <span className="ml-auto text-xs text-slate">{summary}</span>
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted transition-transform group-open:rotate-90" />
+        <span className="text-sm font-medium text-fg">{title}</span>
+        <span className="ml-auto text-xs text-muted">{summary}</span>
       </summary>
       <div className="mt-2 pb-3 pl-6">{children}</div>
     </details>
@@ -59,36 +59,36 @@ export function Parties({
     <Section title="Who is involved">
       <dl className="flex flex-col gap-4 text-sm">
         <div>
-          <dt className="text-xs text-slate">Signs first · counterparty</dt>
-          <dd className="mt-0.5 text-paper">{counterparty.name}</dd>
-          <dd className="break-all text-slate">{counterparty.email}</dd>
+          <dt className="text-xs text-muted">Signs first · counterparty</dt>
+          <dd className="mt-0.5 text-fg">{counterparty.name}</dd>
+          <dd className="break-all text-muted">{counterparty.email}</dd>
         </div>
         <div>
-          <dt className="text-xs text-slate">Countersigns second · designated company signatory</dt>
+          <dt className="text-xs text-muted">Countersigns second · designated company signatory</dt>
           {countersigner ? (
             <>
-              <dd className="mt-0.5 text-paper">
+              <dd className="mt-0.5 text-fg">
                 {countersigner.name}
-                {countersigner.you && <span className="text-slate"> (you)</span>}
+                {countersigner.you && <span className="text-muted"> (you)</span>}
               </dd>
-              <dd className="text-slate">{ROLE_LABELS[countersigner.role]}</dd>
-              <dd className="mt-1 text-xs text-slate">
+              <dd className="text-muted">{ROLE_LABELS[countersigner.role]}</dd>
+              <dd className="mt-1 text-xs text-muted">
                 {countersigner.isSignatory
                   ? "Chosen when the agreement was created. No one else can countersign it."
                   : "No longer authorized to countersign."}
               </dd>
             </>
           ) : (
-            <dd className="mt-0.5 text-slate">Not assigned</dd>
+            <dd className="mt-0.5 text-muted">Not assigned</dd>
           )}
         </div>
         <div>
-          <dt className="text-xs text-slate">{sender.sent ? "Prepared and sent by" : "Prepared by"}</dt>
-          <dd className="mt-0.5 text-paper">
+          <dt className="text-xs text-muted">{sender.sent ? "Prepared and sent by" : "Prepared by"}</dt>
+          <dd className="mt-0.5 text-fg">
             {sender.name}
-            {sender.you && <span className="text-slate"> (you)</span>}
+            {sender.you && <span className="text-muted"> (you)</span>}
           </dd>
-          <dd className="text-slate">{ROLE_LABELS[sender.role]}</dd>
+          <dd className="text-muted">{ROLE_LABELS[sender.role]}</dd>
         </div>
       </dl>
     </Section>
@@ -112,23 +112,23 @@ export function Delivery({ messages, canRetry }: { messages: DeliveryRow[]; canR
       ? "Nothing sent yet"
       : failed > 0
         ? `${failed} failed`
-        : `${messages.length} in demo outbox`;
+        : `${messages.length} in outbox`;
 
   return (
     <Collapsible title="Delivery" summary={<span className={failed ? "text-danger" : undefined}>{summary}</span>} open={failed > 0}>
       {messages.length === 0 ? (
-        <p className="text-sm text-slate">Notifications appear here once the agreement is sent.</p>
+        <p className="text-sm text-muted">Notifications appear here once the agreement is sent.</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {messages.map((m) => (
             <li key={m.id} className="text-sm">
-              <p className="text-paper">
-                {MESSAGE_KIND_LABELS[m.kind]} <span className="text-slate">to {m.recipientName}</span>
+              <p className="text-fg">
+                {MESSAGE_KIND_LABELS[m.kind]} <span className="text-muted">to {m.recipientName}</span>
               </p>
-              <p className={`text-xs ${m.status === "FAILED" ? "text-danger" : "text-slate"}`}>
+              <p className={`text-xs ${m.status === "FAILED" ? "text-danger" : "text-muted"}`}>
                 {DELIVERY_STATUS_LABELS[m.status]} · {formatDateTime(m.deliveredAt ?? m.createdAt)}
               </p>
-              {m.status === "FAILED" && m.lastError && <p className="mt-0.5 text-xs text-slate">{m.lastError}</p>}
+              {m.status === "FAILED" && m.lastError && <p className="mt-0.5 text-xs text-muted">{m.lastError}</p>}
               {m.status === "FAILED" && canRetry && (
                 <div className="mt-2">
                   <ActionButton action={retryDeliveryAction.bind(null, m.id)} label="Retry delivery" pendingLabel="Retrying…" />
@@ -138,9 +138,9 @@ export function Delivery({ messages, canRetry }: { messages: DeliveryRow[]; canR
           ))}
         </ul>
       )}
-      <p className="mt-3 text-xs text-slate">
-        Demo mode sends no email.{" "}
-        <Link href="/outbox" className="text-signal hover:underline">
+      <p className="mt-3 text-xs text-muted">
+        Signing links appear in the outbox.{" "}
+        <Link href="/outbox" className="text-accent hover:underline">
           Open the outbox
         </Link>
       </p>
@@ -156,8 +156,8 @@ export function History({ events, agreementId }: { events: HistoryEvent[]; agree
       <ol className="flex flex-col gap-3">
         {events.map((e) => (
           <li key={e.id} className="text-sm">
-            <p className="text-paper">{eventLabel(e.eventType, e.actorType)}</p>
-            <p className="text-xs text-slate">
+            <p className="text-fg">{eventLabel(e.eventType, e.actorType)}</p>
+            <p className="text-xs text-muted">
               {e.actor}
               {e.actorType === "COUNTERPARTY_LINK" && " · via signing link"}
               {" · "}
@@ -166,9 +166,9 @@ export function History({ events, agreementId }: { events: HistoryEvent[]; agree
           </li>
         ))}
       </ol>
-      <p className="mt-3 text-xs text-slate">
+      <p className="mt-3 text-xs text-muted">
         The history is append-only: entries cannot be edited or removed.{" "}
-        <Link href={`/audit?agreement=${agreementId}`} className="text-signal hover:underline">
+        <Link href={`/audit?agreement=${agreementId}`} className="text-accent hover:underline">
           Open in audit log
         </Link>
       </p>
@@ -183,18 +183,18 @@ export function Fingerprints({ frozen, executed }: { frozen: string | null; exec
       <dl className="flex flex-col gap-3 text-sm">
         {frozen && (
           <div>
-            <dt className="text-xs text-slate">Frozen copy — what both parties sign</dt>
-            <dd className="mt-0.5 font-mono text-xs break-all text-paper">{frozen}</dd>
+            <dt className="text-xs text-muted">Frozen copy: what both parties sign</dt>
+            <dd className="mt-0.5 font-mono text-xs break-all text-fg">{frozen}</dd>
           </div>
         )}
         {executed && (
           <div>
-            <dt className="text-xs text-slate">Executed copy</dt>
-            <dd className="mt-0.5 font-mono text-xs break-all text-paper">{executed}</dd>
+            <dt className="text-xs text-muted">Executed copy</dt>
+            <dd className="mt-0.5 font-mono text-xs break-all text-fg">{executed}</dd>
           </div>
         )}
       </dl>
-      <p className="mt-3 text-xs text-slate">
+      <p className="mt-3 text-xs text-muted">
         Each signature is bound to the frozen copy&rsquo;s fingerprint; any change to the document would change it.
       </p>
     </Collapsible>

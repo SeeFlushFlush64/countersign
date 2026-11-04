@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 import { prisma } from "@/lib/prisma";
+import { SAMPLE_COUNTERSIGNER_EMAIL, sampleSignInEnabled } from "@/lib/sample-workspace";
 
 declare module "next-auth" {
   interface Session {
@@ -22,6 +23,23 @@ type AppJWT = {
   senderRole: string;
   sub?: string;
 };
+
+type AccountRow = {
+  id: string;
+  email: string;
+  senderId: string;
+  sender: { name: string; role: string };
+};
+
+function sessionUser(user: AccountRow) {
+  return {
+    id: user.id,
+    email: user.email,
+    senderId: user.senderId,
+    senderName: user.sender.name,
+    senderRole: user.sender.role,
+  };
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -48,13 +66,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          senderId: user.senderId,
-          senderName: user.sender.name,
-          senderRole: user.sender.role,
-        };
+        return sessionUser(user);
+      },
+    }),
+    // One-click entry to the sample workspace: no password, and only where
+    // sampleSignInEnabled() allows it. See src/lib/sample-workspace.ts.
+    Credentials({
+      id: "sample-workspace",
+      name: "Sample workspace",
+      credentials: {},
+      async authorize() {
+        if (!sampleSignInEnabled()) return null;
+        const user = await prisma.user.findUnique({
+          where: { email: SAMPLE_COUNTERSIGNER_EMAIL },
+          include: { sender: true },
+        });
+        return user ? sessionUser(user) : null;
       },
     }),
   ],

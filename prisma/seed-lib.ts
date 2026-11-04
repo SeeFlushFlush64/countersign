@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../src/lib/prisma";
 import { DocumentStatus, PartyRole, Role } from "../src/generated/prisma/enums";
 import type { TemplateType } from "../src/generated/prisma/enums";
@@ -27,13 +28,20 @@ import { signatureDataUrl } from "./png-signature";
 
 export const DEMO_LOGIN_EMAIL = "demo@countersign.dev";
 export const DEMO_PARALEGAL_EMAIL = "paralegal@countersign.dev";
-export const DEMO_LOGIN_PASSWORD = "countersign-demo";
+// The sample accounts no longer have a published password: they are entered
+// through the sample workspace button. This was their old password; the seed
+// replaces any account still holding it with an unusable one.
+export const RETIRED_SAMPLE_PASSWORD = "countersign-demo";
+
+async function unusablePasswordHash(): Promise<string> {
+  return bcrypt.hash(randomBytes(32).toString("hex"), 10);
+}
 
 // Two published demo accounts: a signatory who countersigns every seeded
 // agreement, and a non-signatory who is refused at countersignature.
 export const DEMO_USERS = [
-  { email: DEMO_LOGIN_EMAIL, senderEmail: "dana.whitfield@northlightmedia.com", isSignatory: true },
-  { email: DEMO_PARALEGAL_EMAIL, senderEmail: "tomas.reyes@northlightmedia.com", isSignatory: false },
+  { email: DEMO_LOGIN_EMAIL, senderEmail: "dana.whitfield@northlight.example", isSignatory: true },
+  { email: DEMO_PARALEGAL_EMAIL, senderEmail: "tomas.reyes@northlight.example", isSignatory: false },
 ] as const;
 
 const HOUR = 60 * 60 * 1000;
@@ -62,62 +70,62 @@ export type SeedDocument = {
 };
 
 export const SEED_SENDERS = [
-  { name: "Dana Whitfield", email: "dana.whitfield@northlightmedia.com", role: Role.GENERAL_COUNSEL },
-  { name: "Marcus Ilori", email: "marcus.ilori@northlightmedia.com", role: Role.CONTRACTS_MANAGER },
-  { name: "Priya Anand", email: "priya.anand@northlightmedia.com", role: Role.BUSINESS_AFFAIRS },
-  { name: "Tomás Reyes", email: "tomas.reyes@northlightmedia.com", role: Role.PARALEGAL },
+  { name: "Dana Whitfield", email: "dana.whitfield@northlight.example", role: Role.GENERAL_COUNSEL },
+  { name: "Marcus Ilori", email: "marcus.ilori@northlight.example", role: Role.CONTRACTS_MANAGER },
+  { name: "Priya Anand", email: "priya.anand@northlight.example", role: Role.BUSINESS_AFFAIRS },
+  { name: "Tomás Reyes", email: "tomas.reyes@northlight.example", role: Role.PARALEGAL },
 ];
 
 export const SEED_DOCUMENTS: SeedDocument[] = [
   {
-    senderEmail: "dana.whitfield@northlightmedia.com",
+    senderEmail: "dana.whitfield@northlight.example",
     templateType: "NDA",
-    title: "Mutual NDA — Ashgrove Creative LLC",
+    title: "Mutual NDA with Ashgrove Creative LLC",
     counterpartyName: "Ashgrove Creative LLC",
-    counterpartyEmail: "hello@ashgrovecreative.com",
+    counterpartyEmail: "hello@ashgrove.example",
     stage: "executed",
     createdHoursAgo: 11 * 24,
   },
   {
-    senderEmail: "marcus.ilori@northlightmedia.com",
+    senderEmail: "marcus.ilori@northlight.example",
     templateType: "VENDOR_AGREEMENT",
-    title: "Vendor Services Agreement — Petrel Logistics Co.",
+    title: "Vendor Services Agreement with Petrel Logistics Co.",
     counterpartyName: "Petrel Logistics Co.",
-    counterpartyEmail: "contracts@petrellogistics.com",
+    counterpartyEmail: "contracts@petrel-logistics.example",
     stage: "counterpartySigned",
     createdHoursAgo: 4 * 24,
   },
   {
-    senderEmail: "priya.anand@northlightmedia.com",
+    senderEmail: "priya.anand@northlight.example",
     templateType: "MEDIA_RELEASE",
-    title: "Media Release — Jordan Vance",
+    title: "Media Release with Jordan Vance",
     counterpartyName: "Jordan Vance",
     counterpartyEmail: "jordan.vance@example.com",
     stage: "sent",
     createdHoursAgo: 2 * 24,
   },
   {
-    senderEmail: "tomas.reyes@northlightmedia.com",
+    senderEmail: "tomas.reyes@northlight.example",
     templateType: "LICENSING_ORDER",
-    title: "Content Licensing Order — Fenwick Sound Library",
+    title: "Content Licensing Order with Fenwick Sound Library",
     counterpartyName: "Fenwick Sound Library",
-    counterpartyEmail: "licensing@fenwicksound.com",
+    counterpartyEmail: "licensing@fenwick-sound.example",
     stage: "draft",
     createdHoursAgo: 3,
   },
   {
-    senderEmail: "marcus.ilori@northlightmedia.com",
+    senderEmail: "marcus.ilori@northlight.example",
     templateType: "NDA",
-    title: "Mutual NDA — Blackwood Studio Rentals",
+    title: "Mutual NDA with Blackwood Studio Rentals",
     counterpartyName: "Blackwood Studio Rentals",
-    counterpartyEmail: "studio@blackwoodrentals.com",
+    counterpartyEmail: "studio@blackwood-rentals.example",
     stage: "executed",
     createdHoursAgo: 8 * 24,
   },
   {
-    senderEmail: "priya.anand@northlightmedia.com",
+    senderEmail: "priya.anand@northlight.example",
     templateType: "VENDOR_AGREEMENT",
-    title: "Vendor Services Agreement — Halcyon Catering Co.",
+    title: "Vendor Services Agreement with Halcyon Catering Co.",
     counterpartyName: "Halcyon Catering Co.",
     counterpartyEmail: "events@halcyon-catering.example",
     stage: "voided",
@@ -175,11 +183,12 @@ async function seedDocument(
   signatoryUserId: string,
   creatorUserId: string | undefined,
   anchor: Date,
+  target: { epochId: number; deferPreviews: boolean },
   report: SeedReport,
   log: (line: string) => void,
 ) {
   const existing = await prisma.document.findMany({
-    where: { title: spec.title, senderId },
+    where: { title: spec.title, senderId, epochId: target.epochId },
     select: { id: true, status: true, countersignerId: true },
     orderBy: { createdAt: "asc" },
   });
@@ -222,8 +231,10 @@ async function seedDocument(
       title: spec.title,
       counterpartyName: spec.counterpartyName,
       counterpartyEmail: spec.counterpartyEmail,
+      epochId: target.epochId,
     },
     { now: createdAt },
+    { deferPreview: target.deferPreviews },
   );
 
   const signatory = { userId: signatoryUserId };
@@ -275,9 +286,16 @@ async function seedDocument(
 export async function seed({
   anchor,
   log = console.log,
+  epochId,
+  deferPreviews = false,
 }: {
   anchor: Date;
   log?: (line: string) => void;
+  // The demo epoch to seed (default: the current one). The demo reset seeds
+  // a new, preparing epoch; documents in other epochs are never looked at.
+  epochId?: number;
+  // Leave draft previews to render when first opened (the demo reset).
+  deferPreviews?: boolean;
 }): Promise<SeedReport> {
   if (Number.isNaN(anchor.getTime())) {
     throw new Error("Seed anchor is not a valid date.");
@@ -317,7 +335,7 @@ export async function seed({
       const created = await prisma.user.create({
         data: {
           email: demo.email,
-          passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10),
+          passwordHash: await unusablePasswordHash(),
           senderId,
           isSignatory: demo.isSignatory,
         },
@@ -325,14 +343,14 @@ export async function seed({
       userIds.set(demo.email, created.id);
       continue;
     }
-    // Keep the published demo credentials and roles as documented.
-    const passwordOk = await bcrypt.compare(DEMO_LOGIN_PASSWORD, existingUser.passwordHash);
-    if (!passwordOk || existingUser.isSignatory !== demo.isSignatory) {
+    // Keep the roles as documented, and retire the old published password.
+    const retired = await bcrypt.compare(RETIRED_SAMPLE_PASSWORD, existingUser.passwordHash);
+    if (retired || existingUser.isSignatory !== demo.isSignatory) {
       await prisma.user.update({
         where: { id: existingUser.id },
         data: {
           isSignatory: demo.isSignatory,
-          ...(passwordOk ? {} : { passwordHash: await bcrypt.hash(DEMO_LOGIN_PASSWORD, 10) }),
+          ...(retired ? { passwordHash: await unusablePasswordHash() } : {}),
         },
       });
     }
@@ -343,6 +361,9 @@ export async function seed({
     DEMO_USERS.map((demo) => [demo.senderEmail as string, userIds.get(demo.email)!]),
   );
 
+  const targetEpochId =
+    epochId ?? (await prisma.demoEpoch.findFirstOrThrow({ where: { currentMarker: true }, select: { id: true } })).id;
+
   log("Seeding documents…");
   for (const spec of SEED_DOCUMENTS) {
     await seedDocument(
@@ -351,6 +372,7 @@ export async function seed({
       signatoryUserId,
       userIdBySender.get(spec.senderEmail),
       anchor,
+      { epochId: targetEpochId, deferPreviews },
       report,
       log,
     );

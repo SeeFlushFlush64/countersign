@@ -43,7 +43,7 @@ export const MESSAGE_KIND_LABELS: Record<MessageKind, string> = {
 export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   PENDING: "Queued",
   SENDING: "Sending",
-  DELIVERED: "In demo outbox",
+  DELIVERED: "In outbox",
   FAILED: "Failed",
   CANCELLED: "Cancelled",
 };

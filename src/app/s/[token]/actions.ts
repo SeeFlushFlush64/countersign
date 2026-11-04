@@ -9,7 +9,7 @@ import { signingPath } from "@/lib/signing-links";
 export type SignState = { error: string | null };
 
 // Public by design: the counterparty has no account, and the signing link is
-// their credential. signWithLink enforces everything — the link must be the
+// their credential. signWithLink enforces everything, the link must be the
 // agreement's current, unexpired, unrevoked link, the agreement must be
 // awaiting the counterparty, the signature must be a valid PNG, and it must be
 // bound to the frozen SHA-256 the signer was shown.

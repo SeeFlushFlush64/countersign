@@ -1,9 +1,21 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 
 export type LoginState = { error: string | null };
+
+// The one-click entry: signs in to the sample workspace as its countersigner.
+// signIn redirects by throwing, which must propagate.
+export async function openSampleWorkspace(): Promise<void> {
+  try {
+    await signIn("sample-workspace", { redirectTo: "/agreements" });
+  } catch (error) {
+    if (error instanceof AuthError) redirect("/login?sample=unavailable");
+    throw error;
+  }
+}
 
 export async function authenticate(
   _prevState: LoginState,

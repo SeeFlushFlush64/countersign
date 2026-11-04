@@ -41,10 +41,10 @@ export function SignAgreementForm({
     <form onSubmit={submit} className="flex flex-col gap-5">
       <SignatureField ref={field} signerName={signerName} onReadyChange={setReady} disabled={pending} />
 
-      <p className="text-[13px] text-slate">
+      <p className="text-[13px] text-muted">
         By signing, you agree to sign this agreement electronically as {signerName}. Your signature applies only to
         this exact document (fingerprint{" "}
-        <abbr title={`SHA-256 ${fingerprint}`} className="font-mono text-paper no-underline">
+        <abbr title={`SHA-256 ${fingerprint}`} className="font-mono text-fg no-underline">
           {fingerprint.slice(0, 8)}…{fingerprint.slice(-4)}
         </abbr>
         ); a changed document would be refused.
@@ -56,7 +56,7 @@ export function SignAgreementForm({
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-panel-border bg-ink/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-canvas/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
         <button type="submit" disabled={pending || !ready} className={buttonClasses("primary", "md", "w-full")}>
           {pending ? <LoaderCircle aria-hidden className="animate-spin" /> : <PenLine aria-hidden />}
           {pending ? "Signing…" : "Sign agreement"}

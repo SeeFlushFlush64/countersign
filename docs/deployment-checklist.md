@@ -1,23 +1,37 @@
 # Deployment checklist
 
-Countersign is not deployed. This file records what must be true before it
-is, and the security assumptions a deployment relies on. Items marked
-**Blocker** must be resolved first; do not deploy while any is open.
+What a Countersign deployment needs, and the security assumptions it relies
+on. Items marked **Required** must be in place before a deployment takes
+traffic. Last reviewed 2026-11-04.
 
-## Blockers
+## Scope
 
-### 1. Public landing-page activity feed must be removed — **Blocker**
+Countersign is a narrow product: the counterparty signs first, then the
+designated company countersigner, enforced server-side. Scope lock of
+2026-10-06, reaffirmed 2026-11-04: **no Google Drive archive, no outbound
+webhooks, no email integration** (see "No third-party integrations" below).
 
-An uncommitted marketing landing page (`src/app/page.tsx` on the `main`
-working tree, not part of this branch) renders a live activity feed from
-`StatusEvent` to anonymous visitors: agreement titles and party names. When
-that work is integrated, the feed must be removed (or replaced with static
-illustration content) before any deployment.
+## Current deployment
 
-Integrating it is otherwise safe with this branch: every internal page and
-the company PDF route verify the session themselves, so making `/` public in
-the proxy does not expose agreement data. `test/public-surface.test.ts`
-checks this for every internal page.
+- **Host:** Vercel project `countersign-demo` (Hobby scope), function region
+  `sin1`, Node 24. Database: Neon project `countersign-demo` (Singapore,
+  Postgres 18).
+- **Deploys:** uploaded with the Vercel CLI from a clean `git archive`
+  export. The project has no Git link yet, so no branch deploys on push.
+- **Access:** Vercel Authentication is on, so anonymous visitors are sent to
+  Vercel sign-in. The app is not public until that is changed on purpose.
+- **Domain:** none. `countersign-demo-seven.vercel.app` is the only alias.
+- **Sample-workspace guards:** epochs, idle reset, limits, noindex and
+  Chromium packaging are part of the main code and switch on with `DEMO_MODE=1`.
+
+## Required
+
+### 1. Public landing page
+
+`/` is static marketing content and reads no agreement data. Every internal
+page and the company PDF route verify the session themselves, so making `/`
+public in the proxy exposes nothing. `test/public-surface.test.ts` checks
+this for every internal page; keep it passing if `/` ever gains data.
 
 ### 2. Production audit key
 
@@ -33,7 +47,7 @@ Set both in the production environment:
 
 - `DELIVERY_MODE=demo-outbox`. It is the only mode: no email integration
   exists, and any other value (or none, in production) makes every delivery
-  fail with a configuration error — recorded on the message, visible in the
+  fail with a configuration error, recorded on the message, visible in the
   outbox, retryable once fixed. Agreements are never affected.
 - `OUTBOX_ENCRYPTION_KEY` (at least 32 random characters). Without it, send
   and reissue fail closed in production (`MissingOutboxKeyError`) before
@@ -42,21 +56,30 @@ Set both in the production environment:
   their delivery fails; rotating the key does the same to links already in
   the outbox (reissue to get a new one). Set it before seeding production.
 
-### 4. Google Drive must not be integrated
+### 4. No third-party integrations
 
-The uncommitted `main` working tree contains a Google Drive upload
-(`src/lib/drive.ts`, called while signing). It is not part of this branch and
-must not be brought back into the signing lifecycle when that work is
-integrated: executed PDFs are `DocumentArtifact` rows, and
+By decision (scope lock), executed PDFs are `DocumentArtifact` rows in the
+database and nothing is pushed to Google Drive, a webhook receiver or an
+email provider. An earlier Drive upload was removed and must not be brought back.
 `test/production-integrations.test.ts` fails if any source file imports
 Google APIs or an email SDK, or reads their credentials.
+
+### 5. Sample workspace: `DEMO_MODE` and the connection strings
+
+- Set `DEMO_MODE=1` only on the hosted sample workspace. It turns on epochs,
+  the idle reset and the per-epoch limits (see the README). Do not set it
+  anywhere that holds real agreements.
+- `DATABASE_URL` is the pooled connection (Neon's `-pooler` host, with
+  `sslmode=verify-full`). `DIRECT_URL` is the direct connection and is used
+  only by `npm run db:*` on a developer machine; never upload it to Vercel.
+- Put the Neon function region next to the Vercel region (both Singapore).
 
 ## Production database migration
 
 1. Read-only first: `prisma migrate status` against the production database.
 2. Read-only pre-check that existing rows satisfy the Phase B/C constraints
    (they are validated when added; a violation aborts that migration
-   cleanly — each is wrapped in a transaction — but Prisma then records it
+   cleanly, each is wrapped in a transaction, but Prisma then records it
    as failed and `prisma migrate resolve --rolled-back` is needed before a
    retry).
 3. `prisma migrate deploy` (never `migrate reset` or `db push`).
@@ -104,7 +127,7 @@ restoring the database from backup, not by redeploying old code alone.
 Counterparty views and signatures record a keyed HMAC of the client IP,
 never the raw address. The IP is read from `x-vercel-forwarded-for`, then
 `x-real-ip`, then the first `x-forwarded-for` entry. These are trustworthy
-only behind a proxy that sets them itself — Vercel's edge, per its
+only behind a proxy that sets them itself, Vercel's edge, per its
 documented request headers (verify for the deployment target). Anywhere
 else they are client-controlled, so the hash is supporting audit evidence of
 the address the request presented, never an authorization input.
@@ -117,7 +140,7 @@ reissue or void. The token is in the URL path, so it can appear in hosting
 request logs and browser history; responses under `/s/` send
 `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and
 `X-Robots-Tag: noindex`. Anyone holding the link can act as the
-counterparty — there is no second factor (out of scope).
+counterparty, there is no second factor (out of scope).
 
 ### Outbox and signing links
 
@@ -134,7 +157,7 @@ Signature requests carry the counterparty's link, so the outbox stores it
 AES-256-GCM encrypted under `OUTBOX_ENCRYPTION_KEY` and bound to its
 `SigningLink` row; a CHECK constraint rejects anything but ciphertext. The
 database alone therefore still never yields a usable link, but the database
-plus the key does. In demo mode the outbox stands in for the counterparty's
+plus the key does. The outbox stands in for the counterparty's
 inbox: the agreement's sender and designated countersigner can open the
 link there while it works (the same people who can already reissue it).
 A message whose link was replaced, voided or expired is cancelled, never

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { agreementView, type AgreementFacts, type Viewer } from "@/lib/agreement-view";
 import nextConfig from "../next.config";
 
-// Phase E: what the agreement page says and offers — the sequence rail, the
-// headline, and exactly one next action — for every state and every kind of
+// Phase E: what the agreement page says and offers, the sequence rail, the
+// headline, and exactly one next action, for every state and every kind of
 // viewer.
 
 const NOW = new Date("2026-03-10T12:00:00Z");
@@ -169,7 +169,7 @@ describe("plain-language headlines", () => {
   });
 
   it("say who the agreement waits on, without internal status names", () => {
-    expect(view(facts(), sender).headline).toBe("Draft — not sent yet");
+    expect(view(facts(), sender).headline).toBe("Draft: not sent yet");
     expect(view(sent(), sender).headline).toBe("Waiting on Jordan Vance to sign");
     expect(view(signed(), countersigner).headline).toBe("Ready for your countersignature");
     expect(view(signed(), sender).headline).toBe("Waiting on Dana Whitfield to countersign");

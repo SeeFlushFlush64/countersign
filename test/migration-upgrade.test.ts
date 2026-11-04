@@ -6,8 +6,8 @@ import { describe, expect, inject, it } from "vitest";
 import { createDatabase, databaseUrl } from "./harness/postgres";
 
 // The Phase B migration must upgrade a database that already holds
-// agreements created by the earlier code (this is what production holds) —
-// additively, preserving every row — and must be all-or-nothing.
+// agreements created by the earlier code (this is what production holds) -
+// additively, preserving every row, and must be all-or-nothing.
 
 const MIGRATIONS = path.resolve("prisma/migrations");
 const INIT = readFileSync(path.join(MIGRATIONS, "20260819105442_init/migration.sql"), "utf8");

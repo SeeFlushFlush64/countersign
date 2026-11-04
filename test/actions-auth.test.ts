@@ -222,7 +222,7 @@ describe("outbox actions", () => {
     expect((await prisma.outboundMessage.findUniqueOrThrow({ where: { id } })).status).toBe("FAILED");
 
     signedInAs(company.paralegal.userId);
-    expect(await retryDeliveryAction(id)).toEqual({ error: null, result: "In demo outbox" });
+    expect(await retryDeliveryAction(id)).toEqual({ error: null, result: "In outbox" });
     expect((await prisma.outboundMessage.findUniqueOrThrow({ where: { id } })).status).toBe("DELIVERED");
   });
 });

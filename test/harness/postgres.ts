@@ -137,7 +137,7 @@ export async function migrate(url: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, [prismaCli, "migrate", "deploy"], {
       // prisma.config.ts prefers DIRECT_URL, and loads .env without
-      // overriding variables that are already set — so both are pinned to
+      // overriding variables that are already set, so both are pinned to
       // the throwaway database here, never left to fall back to .env.
       env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
       stdio: ["ignore", "pipe", "pipe"],

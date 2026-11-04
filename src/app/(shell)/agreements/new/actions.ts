@@ -31,7 +31,7 @@ export async function createDocumentAction(
   formData: FormData,
 ): Promise<CreateDocumentState> {
   // senderId and the creator come from the authenticated session, never from
-  // client input — a submitted form field would let anyone create documents
+  // client input, a submitted form field would let anyone create documents
   // as any sender.
   const session = await auth();
   if (!session?.user?.id || !session.user.senderId) {
@@ -44,13 +44,13 @@ export async function createDocumentAction(
   });
   if (!form.success) return { error: firstIssue(form.error) };
 
-  // An empty title is replaced with "<template> — <counterparty>"; every
+  // An empty title is replaced with "<template>, <counterparty>"; every
   // field is then trimmed, whitespace-collapsed and length-checked by the
   // same rules createDocument enforces.
   const counterpartyName = normalizeText(field(formData, "counterpartyName"));
   const title =
     normalizeText(field(formData, "title")) ||
-    `${TEMPLATE_TYPE_LABELS[form.data.templateType]} — ${counterpartyName}`;
+    `${TEMPLATE_TYPE_LABELS[form.data.templateType]} with ${counterpartyName}`;
   const input = agreementInputSchema.safeParse({
     title,
     counterpartyName,

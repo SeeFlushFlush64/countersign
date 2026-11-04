@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { Ban, CircleCheck, Clock, Download, Eye, LoaderCircle, RefreshCw, ShieldCheck } from "lucide-react";
+import { Ban, CircleCheck, Clock, Download, Eye, LoaderCircle, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { recordLinkView } from "@/lib/documents";
 import { getSigningRoom } from "@/lib/queries";
@@ -42,6 +42,14 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
             <p>A newer signing link was issued for this agreement, so this one no longer works.</p>
             <p>Use the most recent link you received, or ask the person who sent it for a new one.</p>
           </LinkProblem>
+        ) : link.state === "reset" ? (
+          <LinkProblem icon={<RotateCcw aria-hidden className="size-6" />} title="This workspace has been reset">
+            <p>
+              This link belongs to an earlier session of the Countersign sample workspace. The workspace starts fresh
+              after a period of inactivity, and earlier agreements are no longer available.
+            </p>
+            <p>To start again, begin from the Countersign home page.</p>
+          </LinkProblem>
         ) : link.state === "voided" ? (
           <LinkProblem icon={<Ban aria-hidden className="size-6" />} title="This agreement was voided">
             <p>The sender voided this agreement, so it can no longer be viewed or signed here.</p>
@@ -62,7 +70,7 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
   const previewing = Boolean(session?.user?.id);
 
   // The view is recorded on the server, from a validated link, after the
-  // response is sent — once per link. Company users previewing the link are
+  // response is sent, once per link. Company users previewing the link are
   // not recorded as the counterparty.
   if (!previewing) {
     const context = await requestContext();
@@ -125,10 +133,10 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
   return (
     <RecipientFrame>
       {mode === "preview" && (
-        <div role="note" className="mb-6 flex items-start gap-3 border-y border-panel-border py-3 text-sm text-slate">
+        <div role="note" className="mb-6 flex items-start gap-3 border-y border-rule py-3 text-sm text-muted">
           <Eye aria-hidden className="mt-0.5 size-4 shrink-0" />
           <p>
-            Preview — you&rsquo;re signed in to Countersign as a company user. This visit isn&rsquo;t recorded, and
+            Preview: you&rsquo;re signed in to Countersign as a company user. This visit isn&rsquo;t recorded, and
             you can&rsquo;t sign as the counterparty here. Open the link in a private window to see their view.
           </p>
         </div>
@@ -138,14 +146,14 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
         {mode === "executed" ? (
           <p className="text-sm font-medium text-state-done">Executed</p>
         ) : mode === "signed" ? (
-          <p className="text-sm font-medium text-state-waiting">Signed — waiting for the countersignature</p>
+          <p className="text-sm font-medium text-state-waiting">Signed, waiting for the countersignature</p>
         ) : (
-          <p className="text-sm font-medium text-signal">{COMPANY_NAME} asks you to sign</p>
+          <p className="text-sm font-medium text-accent">{COMPANY_NAME} asks you to sign</p>
         )}
-        <h1 className="mt-1 font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-paper lg:text-[1.75rem]">
+        <h1 className="mt-1 font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-fg lg:text-[1.75rem]">
           {document.title}
         </h1>
-        <p className="mt-2 max-w-3xl text-[15px] text-slate">
+        <p className="mt-2 max-w-3xl text-[15px] text-muted">
           {mode === "executed" ? (
             <>
               Both signatures are in place: you signed first
@@ -172,7 +180,7 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
         <RecipientSteps steps={steps} tone={mode === "signed" ? "waiting" : "action"} />
       </section>
 
-      <div className="mt-8 grid gap-10 border-t border-panel-border pt-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="mt-8 grid gap-10 border-t border-rule pt-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <DocumentPanel
           id={document.id}
           title={document.title}
@@ -191,16 +199,16 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
         <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
           {mode === "sign" && (
             <section aria-labelledby="sign-heading">
-              <h2 id="sign-heading" className="text-sm font-medium text-paper">
+              <h2 id="sign-heading" className="text-sm font-medium text-fg">
                 Sign as {signer.name}
               </h2>
-              <p className="mt-0.5 mb-4 text-[13px] text-slate">Read the document first. Draw your signature, or type your name.</p>
+              <p className="mt-0.5 mb-4 text-[13px] text-muted">Read the document first. Draw your signature, or type your name.</p>
               <SignAgreementForm
                 signerName={signer.name}
                 fingerprint={document.frozenSha256!}
                 action={signLinkAction.bind(null, token, document.frozenSha256!)}
               />
-              <p className="mt-4 flex items-start gap-2 text-xs text-slate">
+              <p className="mt-4 flex items-start gap-2 text-xs text-muted">
                 <ShieldCheck aria-hidden className="mt-px size-4 shrink-0" />
                 This private link works until {formatLongDate(expiresAt)}. Anyone who has it can sign as you, so
                 don&rsquo;t forward it.
@@ -209,8 +217,8 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
           )}
 
           {mode === "preview" && (
-            <section className="text-sm text-slate">
-              <h2 className="text-sm font-medium text-paper">Signing is for {details!.counterpartyName}</h2>
+            <section className="text-sm text-muted">
+              <h2 className="text-sm font-medium text-fg">Signing is for {details!.counterpartyName}</h2>
               <p className="mt-1">
                 The counterparty signs here from their own browser. The countersignature comes after, on the
                 agreement page.
@@ -221,12 +229,12 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
           {mode === "signed" && (
             <section className="flex flex-col gap-3">
               <CircleCheck aria-hidden className="size-6 text-state-done" />
-              <h2 className="text-lg font-medium text-paper">You&rsquo;ve signed</h2>
-              <p className="text-sm text-slate">
+              <h2 className="text-lg font-medium text-fg">You&rsquo;ve signed</h2>
+              <p className="text-sm text-muted">
                 Signed {signedAt && formatDateTime(signedAt)} as {signer.name}. There&rsquo;s nothing else for you to
                 do now.
               </p>
-              <p className="text-sm text-slate">
+              <p className="text-sm text-muted">
                 Come back to this link to download the executed copy once {countersignerName} has countersigned. It
                 keeps working until {formatLongDate(expiresAt)}.
               </p>
@@ -236,38 +244,38 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
           {mode === "executed" && (
             <section aria-labelledby="receipt-heading" className="flex flex-col gap-4">
               <div>
-                <h2 id="receipt-heading" className="text-lg font-medium text-paper">
+                <h2 id="receipt-heading" className="text-lg font-medium text-fg">
                   Your executed copy
                 </h2>
-                <p className="mt-1 text-sm text-slate">
+                <p className="mt-1 text-sm text-muted">
                   {executedReady
                     ? "Download it to keep: this page stops working after the link expires."
                     : "It is being prepared. Trying to open it starts it again if needed."}
                 </p>
               </div>
 
-              <dl className="flex flex-col gap-3 border-y border-panel-border py-4 text-sm">
+              <dl className="flex flex-col gap-3 border-y border-rule py-4 text-sm">
                 <div>
-                  <dt className="text-xs text-slate">Signed first</dt>
-                  <dd className="text-paper">{details!.counterpartyName} (you)</dd>
-                  {signedAt && <dd className="text-[13px] text-slate">{formatDateTime(signedAt)}</dd>}
+                  <dt className="text-xs text-muted">Signed first</dt>
+                  <dd className="text-fg">{details!.counterpartyName} (you)</dd>
+                  {signedAt && <dd className="text-[13px] text-muted">{formatDateTime(signedAt)}</dd>}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate">Countersigned</dt>
-                  <dd className="text-paper">{countersignerName}</dd>
-                  <dd className="text-[13px] text-slate">
+                  <dt className="text-xs text-muted">Countersigned</dt>
+                  <dd className="text-fg">{countersignerName}</dd>
+                  <dd className="text-[13px] text-muted">
                     {countersignerRole}
                     {details!.countersignedAt && <> · {formatDateTime(details!.countersignedAt)}</>}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-slate">Available here until</dt>
-                  <dd className="text-paper">{formatLongDate(expiresAt)}</dd>
+                  <dt className="text-xs text-muted">Available here until</dt>
+                  <dd className="text-fg">{formatLongDate(expiresAt)}</dd>
                 </div>
               </dl>
 
 
-              <div className="fixed inset-x-0 bottom-0 z-20 border-t border-panel-border bg-ink/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              <div className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-canvas/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
                 {executedReady ? (
                   <a href={`/s/${token}/document?download=1`} className={buttonClasses("primary", "md", "w-full")}>
                     <Download aria-hidden />
@@ -276,26 +284,26 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
                 ) : (
                   <a href={`/s/${token}/document`} target="_blank" rel="noreferrer" className={buttonClasses("secondary", "md", "w-full")}>
                     <LoaderCircle aria-hidden />
-                    Executed copy is being prepared — try opening it
+                    Executed copy is being prepared. Try opening it
                   </a>
                 )}
               </div>
 
               <details className="group text-sm">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center text-slate hover:text-paper lg:min-h-8 [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center text-muted hover:text-fg lg:min-h-8 [&::-webkit-details-marker]:hidden">
                   Document fingerprints (SHA-256)
                 </summary>
                 <dl className="mt-2 flex flex-col gap-2 text-xs">
                   {document.frozenSha256 && (
                     <div>
-                      <dt className="text-slate">As sent — what both of you signed</dt>
-                      <dd className="font-mono break-all text-paper">{document.frozenSha256}</dd>
+                      <dt className="text-muted">As sent: what both of you signed</dt>
+                      <dd className="font-mono break-all text-fg">{document.frozenSha256}</dd>
                     </div>
                   )}
                   {executedArtifact?.sha256 && (
                     <div>
-                      <dt className="text-slate">Executed copy</dt>
-                      <dd className="font-mono break-all text-paper">{executedArtifact.sha256}</dd>
+                      <dt className="text-muted">Executed copy</dt>
+                      <dd className="font-mono break-all text-fg">{executedArtifact.sha256}</dd>
                     </div>
                   )}
                 </dl>
@@ -304,8 +312,8 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
           )}
 
           {mode === "closed" && (
-            <section className="text-sm text-slate">
-              <h2 className="text-sm font-medium text-paper">Nothing to sign right now</h2>
+            <section className="text-sm text-muted">
+              <h2 className="text-sm font-medium text-fg">Nothing to sign right now</h2>
               <p className="mt-1">This agreement isn&rsquo;t waiting for your signature.</p>
             </section>
           )}

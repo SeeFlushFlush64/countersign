@@ -79,7 +79,7 @@ export const SignatureField = forwardRef<
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-3">
       <legend className="sr-only">Your signature</legend>
-      <div role="radiogroup" aria-label="How to sign" className="inline-flex self-start rounded-md border border-panel-border p-0.5">
+      <div role="radiogroup" aria-label="How to sign" className="inline-flex self-start rounded-md border border-rule p-0.5">
         {(
           [
             ["draw", "Draw", PenLine],
@@ -93,7 +93,7 @@ export const SignatureField = forwardRef<
             aria-checked={mode === value}
             onClick={() => choose(value)}
             className={`inline-flex h-11 items-center gap-1.5 rounded px-4 text-sm font-medium transition-colors lg:h-8 lg:px-3 ${
-              mode === value ? "bg-panel-hover text-paper" : "text-slate hover:text-paper"
+              mode === value ? "bg-surface-hover text-fg" : "text-muted hover:text-fg"
             }`}
           >
             <Icon aria-hidden className="size-4" />
@@ -111,12 +111,12 @@ export const SignatureField = forwardRef<
               report("draw", !empty, typed);
             }}
           />
-          <div className="mt-2 flex items-center justify-between text-xs text-slate">
+          <div className="mt-2 flex items-center justify-between text-xs text-muted">
             <span>Draw with your finger, mouse or stylus.</span>
             <button
               type="button"
               onClick={() => pad.current?.clear()}
-              className="-mr-2 h-11 rounded px-2 text-slate hover:text-paper lg:h-8"
+              className="-mr-2 h-11 rounded px-2 text-muted hover:text-fg lg:h-8"
             >
               Clear
             </button>
@@ -124,7 +124,7 @@ export const SignatureField = forwardRef<
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          <label htmlFor={typedId} className="text-xs text-slate">
+          <label htmlFor={typedId} className="text-xs text-muted">
             Type your full name
           </label>
           <input
@@ -136,18 +136,18 @@ export const SignatureField = forwardRef<
               setTyped(event.target.value);
               report("type", drawn, event.target.value);
             }}
-            className="h-11 rounded-md border border-panel-border bg-ink px-3 text-base text-paper focus:border-signal focus:outline-none lg:h-10 lg:text-sm"
+            className="h-11 rounded-md border border-rule bg-canvas px-3 text-base text-fg focus:border-accent focus:outline-none lg:h-10 lg:text-sm"
           />
           <div
             aria-hidden
-            className="flex h-28 items-center overflow-hidden rounded-md border border-panel-border bg-paper px-5"
+            className="flex h-28 items-center overflow-hidden rounded-md border border-rule bg-white px-5"
           >
             {/* Scales with the screen so the whole name shows, as it will on the agreement. */}
-            <span className="truncate font-[family-name:var(--font-signature)] text-[clamp(1.5rem,6.5vw,3rem)] font-semibold text-ink">
+            <span className="truncate font-[family-name:var(--font-signature)] text-[clamp(1.5rem,6.5vw,3rem)] font-semibold text-fg">
               {typed.trim() || " "}
             </span>
           </div>
-          <p className="text-xs text-slate">This is how your typed signature will appear on the agreement.</p>
+          <p className="text-xs text-muted">This is how your typed signature will appear on the agreement.</p>
         </div>
       )}
     </fieldset>

@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { QUEUE_VIEWS, VIEW_LABELS, type QueueView } from "@/lib/queue";
 
 // View switcher: plain links in one row. When they do not all fit (phones,
-// tablets), the row scrolls sideways — and says so: the edge that hides
+// tablets), the row scrolls sideways, and says so: the edge that hides
 // more views fades and gets a scroll button, and the active view is always
 // scrolled into sight.
 export function QueueTabs({ active, counts }: { active: QueueView; counts: Record<QueueView, number> }) {
@@ -53,7 +53,7 @@ export function QueueTabs({ active, counts }: { active: QueueView; counts: Recor
   })`;
 
   return (
-    <div className="relative -mx-4 border-b border-panel-border sm:-mx-6 lg:mx-0">
+    <div className="relative -mx-4 border-b border-rule sm:-mx-6 lg:mx-0">
       <nav
         ref={scroller}
         aria-label="Agreement views"
@@ -71,15 +71,15 @@ export function QueueTabs({ active, counts }: { active: QueueView; counts: Recor
                   href={`/agreements?view=${view}`}
                   aria-current={isActive ? "page" : undefined}
                   className={`relative flex h-11 items-center gap-1 px-2 text-sm font-medium whitespace-nowrap transition-colors xl:gap-1.5 xl:px-3 ${
-                    isActive ? "text-paper" : "text-slate hover:text-paper"
+                    isActive ? "text-fg" : "text-muted hover:text-fg"
                   }`}
                 >
                   {VIEW_LABELS[view]}
-                  <span className={`text-xs tabular-nums ${urgent ? "font-semibold text-signal" : "text-slate"}`}>
+                  <span className={`text-xs tabular-nums ${urgent ? "font-semibold text-accent" : "text-muted"}`}>
                     {count}
                   </span>
                   {isActive && (
-                    <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-signal xl:inset-x-3" />
+                    <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent xl:inset-x-3" />
                   )}
                 </Link>
               </li>
@@ -95,7 +95,7 @@ export function QueueTabs({ active, counts }: { active: QueueView; counts: Recor
           tabIndex={-1}
           aria-hidden
           onClick={() => scrollBy(-1)}
-          className="absolute inset-y-0 left-0 flex w-8 items-center justify-center bg-ink text-slate hover:text-paper"
+          className="absolute inset-y-0 left-0 flex w-8 items-center justify-center bg-canvas text-muted hover:text-fg"
         >
           <ChevronLeft className="size-4" />
         </button>
@@ -106,7 +106,7 @@ export function QueueTabs({ active, counts }: { active: QueueView; counts: Recor
           tabIndex={-1}
           aria-hidden
           onClick={() => scrollBy(1)}
-          className="absolute inset-y-0 right-0 flex w-8 items-center justify-center bg-ink text-slate hover:text-paper"
+          className="absolute inset-y-0 right-0 flex w-8 items-center justify-center bg-canvas text-muted hover:text-fg"
         >
           <ChevronRight className="size-4" />
         </button>

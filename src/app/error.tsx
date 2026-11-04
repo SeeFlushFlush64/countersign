@@ -5,7 +5,7 @@ import Link from "next/link";
 import { RotateCw, TriangleAlert } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
 
-// Last-resort boundary for any page or layout below the root layout — e.g.
+// Last-resort boundary for any page or layout below the root layout, e.g.
 // the signed-in frame when the database is unreachable. Shows nothing about
 // the failure beyond a reference that matches the server log.
 export default function RootError({
@@ -24,10 +24,10 @@ export default function RootError({
       <div role="alert" className="flex max-w-md flex-col items-start gap-4">
         <TriangleAlert aria-hidden className="size-6 text-alert" />
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-paper">
+          <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-fg">
             Countersign could not load this page
           </h1>
-          <p className="mt-2 text-sm text-slate">
+          <p className="mt-2 text-sm text-muted">
             Nothing was changed. This is usually a temporary connection problem.
             {error.digest && <span className="font-mono text-xs"> Reference {error.digest}.</span>}
           </p>

@@ -10,6 +10,7 @@ import { sha256Hex } from "@/lib/hash";
 import { InvalidSignatureError, toDataUrl, validateSignature } from "@/lib/signature";
 import { agreementInputSchema, firstIssue, voidReasonSchema } from "@/lib/validation";
 import { DocumentFlowError } from "@/lib/errors";
+import { DEMO_EPOCH_CLOSED_MESSAGE, demoGuardError } from "@/lib/demo/errors";
 import { canManage } from "@/lib/permissions";
 import { outboxKey } from "@/lib/delivery/link-crypto";
 import {
@@ -77,7 +78,7 @@ export { DocumentFlowError, type FlowErrorCode } from "@/lib/errors";
 // and the countersign can only observe that commit before taking its own.
 export type Clock = { now?: Date };
 
-// An authenticated company user, as established by the session — never by
+// An authenticated company user, as established by the session, never by
 // anything the client sends.
 export type Actor = { userId: string };
 
@@ -94,6 +95,7 @@ const LINK_MESSAGES = {
   voided: "This agreement was voided by the sender and can no longer be signed.",
   expired: "This signing link has expired. Ask the sender for a new link.",
   used: "This signing link is no longer valid.",
+  reset: DEMO_EPOCH_CLOSED_MESSAGE,
 } as const;
 
 // Postgres rejected the write on a constraint (e.g. the ordering CHECK or a
@@ -110,6 +112,9 @@ async function inTransition<T>(conflictMessage: string, run: () => Promise<T>): 
     return await run();
   } catch (error) {
     if (error instanceof DocumentFlowError) throw error;
+    // A demo guard (an earlier, reset epoch; a demo limit) says why itself.
+    const demo = demoGuardError(error);
+    if (demo) throw demo;
     if (isConstraintViolation(error)) throw new DocumentFlowError(conflictMessage);
     throw error;
   }
@@ -231,9 +236,16 @@ export async function createDocument(
     counterpartyEmail: string;
     // The signed-in user creating it; omitted only by the seed (SYSTEM).
     createdByUserId?: string;
+    // The demo epoch to create it in: only the demo reset, seeding a new
+    // epoch, names one. Everyone else gets the current epoch (the column
+    // default), and the database refuses any epoch that is not open.
+    epochId?: number;
   },
   { now = new Date() }: Clock = {},
-  deps: Pick<ArtifactDeps, "render"> = {},
+  {
+    deferPreview = false,
+    ...deps
+  }: Pick<ArtifactDeps, "render"> & { deferPreview?: boolean } = {},
 ) {
   const parsed = agreementInputSchema.safeParse(input);
   if (!parsed.success) throw new DocumentFlowError(firstIssue(parsed.error), "INVALID");
@@ -256,53 +268,57 @@ export async function createDocument(
     throw new DocumentFlowError("You can only create agreements as yourself.", "FORBIDDEN");
   }
 
-  const document = await prisma.$transaction(async (tx) => {
-    const created = await tx.document.create({
-      data: {
-        createdAt: now,
-        title,
-        templateType: input.templateType,
-        senderId: input.senderId,
-        countersignerId: countersigner.id,
-        counterpartyName,
-        counterpartyEmail,
-        status: DocumentStatus.DRAFT,
-        signers: {
-          create: [
-            {
-              partyRole: PartyRole.COMPANY,
-              name: countersigner.sender.name,
-              email: countersigner.email,
-            },
-            {
-              partyRole: PartyRole.COUNTERPARTY,
-              name: counterpartyName,
-              email: counterpartyEmail,
-            },
-          ],
+  const document = await inTransition("The agreement could not be created. Try again.", () =>
+    prisma.$transaction(async (tx) => {
+      const created = await tx.document.create({
+        data: {
+          ...(input.epochId === undefined ? {} : { epochId: input.epochId }),
+          createdAt: now,
+          title,
+          templateType: input.templateType,
+          senderId: input.senderId,
+          countersignerId: countersigner.id,
+          counterpartyName,
+          counterpartyEmail,
+          status: DocumentStatus.DRAFT,
+          signers: {
+            create: [
+              {
+                partyRole: PartyRole.COMPANY,
+                name: countersigner.sender.name,
+                email: countersigner.email,
+              },
+              {
+                partyRole: PartyRole.COUNTERPARTY,
+                name: counterpartyName,
+                email: counterpartyEmail,
+              },
+            ],
+          },
         },
-      },
-    });
-    await audit(
-      tx,
-      created.id,
-      StatusEventType.CREATED,
-      creator
-        ? { type: "USER", userId: creator.id, name: sender.name }
-        : { type: "SYSTEM", name: "Countersign (seed)" },
-      now,
-    );
-    // The draft preview is derived after commit; the binding copy is
-    // rendered and frozen at send.
-    await tx.documentArtifact.create({
-      data: { documentId: created.id, kind: ArtifactKind.PREVIEW, status: ArtifactStatus.PENDING },
-    });
-    return created;
-  });
+      });
+      await audit(
+        tx,
+        created.id,
+        StatusEventType.CREATED,
+        creator
+          ? { type: "USER", userId: creator.id, name: sender.name }
+          : { type: "SYSTEM", name: "Countersign (seed)" },
+        now,
+      );
+      // The draft preview is derived after commit; the binding copy is
+      // rendered and frozen at send.
+      await tx.documentArtifact.create({
+        data: { documentId: created.id, kind: ArtifactKind.PREVIEW, status: ArtifactStatus.PENDING },
+      });
+      return created;
+    }),
+  );
 
   // A failed preview is recorded (FAILED) and retried when it is next
-  // opened; the agreement exists either way.
-  await generatePreviewArtifact(document.id, deps);
+  // opened; the agreement exists either way. A deferred one (the demo reset)
+  // is simply left PENDING for that first opening.
+  if (!deferPreview) await generatePreviewArtifact(document.id, deps);
   return document;
 }
 
@@ -429,7 +445,7 @@ export async function sendDocument(
 // agreement has none). Only one request can replace a given link, so a
 // double-click or concurrent reissues produce exactly one new link and one
 // LINK_REISSUED event; every other request fails with a clean conflict
-// (the winner's token cannot be handed out again — only its hash exists).
+// (the winner's token cannot be handed out again, only its hash exists).
 
 export const REISSUE_CONFLICT_MESSAGE =
   "This signing link was already reissued. Use the newest link, or reload and reissue again.";
@@ -631,6 +647,8 @@ export async function voidDocument(
 
 export type LinkView =
   | { state: "not_found" }
+  // The agreement belongs to an earlier session of the demo, since reset.
+  | { state: "reset" }
   | { state: "superseded" }
   | { state: "voided" }
   | { state: "expired"; expiredAt: Date }
@@ -663,11 +681,17 @@ export async function resolveSigningLink(token: unknown, now = new Date()): Prom
           status: true,
           frozenSha256: true,
           sender: { select: { name: true } },
+          epoch: { select: { status: true } },
         },
       },
     },
   });
   if (!link) return { state: "not_found" };
+  // Only a retired or abandoned epoch is closed; the demo reset itself
+  // drives agreements in the epoch it is preparing.
+  if (link.document.epoch.status === "RETIRED" || link.document.epoch.status === "ABANDONED") {
+    return { state: "reset" };
+  }
   if (
     link.revokedReason === LinkRevocationReason.VOIDED ||
     link.document.status === DocumentStatus.VOIDED
@@ -699,7 +723,7 @@ function linkErrorFor(view: Exclude<LinkView, { state: "valid" }>): DocumentFlow
 }
 
 // ---------------------------------------------------------------------------
-// Views: recorded on the server when a valid link's page is served — once per
+// Views: recorded on the server when a valid link's page is served, once per
 // link, never from a client-callable action
 
 export async function recordLinkView(
@@ -1062,7 +1086,7 @@ export async function generateExecutedArtifact(
 // every other query). Company users (signed in) see the executed PDF if READY,
 // otherwise the frozen copy; an agreement that was never sent shows its draft
 // preview. A link holder sees only their own agreement, and only what was
-// sent to them (frozen) or the executed copy — never a preview. A derived PDF
+// sent to them (frozen) or the executed copy, never a preview. A derived PDF
 // that is not READY gets another (idempotent) generation attempt first, and
 // is reported as pending rather than replaced by an older copy.
 
@@ -1098,8 +1122,10 @@ export async function loadAgreementPdf(
   documentId: string,
   deps: ArtifactDeps = {},
 ): Promise<PdfResult> {
-  const document = await prisma.document.findUnique({
-    where: { id: documentId },
+  // Only agreements in the current epoch: an earlier demo session's are gone
+  // from every company page, their PDFs included.
+  const document = await prisma.document.findFirst({
+    where: { id: documentId, epoch: { currentMarker: true } },
     select: { title: true, status: true, sentAt: true },
   });
   if (!document) return null;

@@ -1,48 +1,31 @@
 import Link from "next/link";
-import {
-  Ban,
-  CircleCheck,
-  FilePen,
-  Hourglass,
-  PenLine,
-  Send,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { PenLine } from "lucide-react";
 import type { TemplateType } from "@/generated/prisma/enums";
-import type { AgreementView, QueueRow, Tone } from "@/lib/queue";
+import type { QueueRow, Tone } from "@/lib/queue";
 import { TEMPLATE_TYPE_LABELS } from "@/lib/labels";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { buttonClasses } from "@/components/ui/button";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { SequenceHeader, SequenceSteps } from "./SequenceSteps";
 
-// Wide screens lay the queue out in three aligned columns — the agreement,
-// its place in the signing sequence, and the one action it offers — under a
+// Wide screens lay the queue out in three aligned columns, the agreement,
+// its place in the signing sequence, and the one action it offers, under a
 // single header row. Narrower screens stack them inside each row.
 export const QUEUE_COLUMNS = "xl:grid xl:grid-cols-[minmax(0,1fr)_20rem_8.5rem] xl:items-center xl:gap-8";
 
-const VIEW_ICON: Record<AgreementView, { icon: LucideIcon; className: string }> = {
-  "needs-countersign": { icon: PenLine, className: "text-state-action" },
-  "waiting-counterparty": { icon: Send, className: "text-state-waiting" },
-  "waiting-countersign": { icon: Hourglass, className: "text-state-waiting" },
-  drafts: { icon: FilePen, className: "text-state-draft" },
-  executed: { icon: CircleCheck, className: "text-state-done" },
-  voided: { icon: Ban, className: "text-state-void" },
-};
-
 const HEADLINE_TONE: Record<Tone, string> = {
-  action: "text-signal",
+  action: "text-accent",
   attention: "text-alert",
-  waiting: "text-paper",
-  neutral: "text-paper",
-  done: "text-paper",
-  void: "text-slate",
+  waiting: "text-fg",
+  neutral: "text-fg",
+  done: "text-fg",
+  void: "text-muted",
 };
 
 export function QueueHeader() {
   return (
-    <div aria-hidden className={`hidden border-b border-panel-border px-5 py-2.5 ${QUEUE_COLUMNS}`}>
-      <span className="pl-[34px] text-xs text-slate">Agreement</span>
+    <div aria-hidden className={`hidden border-b border-rule px-5 py-2.5 ${QUEUE_COLUMNS}`}>
+      <span className="text-xs text-muted">Agreement</span>
       <SequenceHeader />
       <span />
     </div>
@@ -53,7 +36,7 @@ function RowAction({ action }: { action: NonNullable<QueueRow["action"]> }) {
   return (
     <Link
       href={action.href}
-      className={buttonClasses("secondary", "sm", "relative z-10 border-signal/60 text-signal hover:border-signal")}
+      className={buttonClasses("secondary", "sm", "relative z-10 border-accent/60 text-accent hover:border-accent")}
     >
       <PenLine aria-hidden />
       {action.label}
@@ -71,25 +54,25 @@ export function AgreementRow({
   now: Date;
 }) {
   const { agreement, view, tone, headline, detail, steps, action } = row;
-  const { icon: Icon, className: iconClass } =
-    tone === "attention" ? { icon: TriangleAlert, className: "text-alert" } : VIEW_ICON[view];
 
   return (
-    <li className={`relative px-4 py-4 transition-colors hover:bg-panel/50 sm:px-5 ${QUEUE_COLUMNS}`}>
+    <li className={`relative px-4 py-4 transition-colors hover:bg-surface/50 sm:px-5 ${QUEUE_COLUMNS}`}>
       <div className="flex min-w-0 gap-3 sm:gap-4">
-        <Icon aria-hidden className={`mt-0.5 size-[18px] shrink-0 ${iconClass}`} />
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] leading-snug font-medium text-paper">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <StatusChip view={view} />
+          </div>
+          <h3 className="mt-2 text-[15px] leading-snug font-medium text-fg">
             {/* The whole row is the link; the action sits above it. */}
             <Link
               href={`/agreements/${agreement.id}`}
-              className="after:absolute after:inset-0 after:rounded-sm focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-signal focus-visible:after:ring-inset"
+              className="after:absolute after:inset-0 after:rounded-sm focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent focus-visible:after:ring-inset"
             >
               {agreement.title}
             </Link>
           </h3>
           <p className={`mt-1 text-sm ${HEADLINE_TONE[tone]}`}>{headline}</p>
-          <p className="mt-0.5 text-[13px] text-slate">
+          <p className="mt-0.5 text-[13px] text-muted">
             {detail && (
               <>
                 {detail.text}

@@ -1,4 +1,4 @@
-// Countersign demo — data model
+// Countersign demo, data model
 // Adjusted from the source spec for Prisma/Next.js convention:
 //   - camelCase fields (Prisma convention) instead of snake_case
 //   - free-text `status` / `template_type` / `party_role` / `event_type` columns
@@ -34,11 +34,11 @@ enum TemplateType {
 
 // Agreement lifecycle. The stored values predate the product's state names
 // and are kept for compatibility (migrations are additive only):
-//   DRAFT            — editable, nothing sent
-//   SENT             — awaiting the counterparty (frozen PDF + hash exist)
-//   PARTIALLY_SIGNED — awaiting the company countersignature
-//   FULLY_EXECUTED   — executed (terminal)
-//   VOIDED           — voided by the company before execution (terminal)
+//   DRAFT           , editable, nothing sent
+//   SENT            , awaiting the counterparty (frozen PDF + hash exist)
+//   PARTIALLY_SIGNED, awaiting the company countersignature
+//   FULLY_EXECUTED  , executed (terminal)
+//   VOIDED          , voided by the company before execution (terminal)
 // The database enforces that the status agrees with the signing timestamps
 // and void metadata, that the countersignature never precedes the
 // counterparty's signature, and that terminal statuses never change (CHECK
@@ -90,6 +90,45 @@ enum ActorType {
 enum LinkRevocationReason {
   SUPERSEDED // replaced by a newer link (reissue)
   VOIDED // the agreement was voided
+}
+
+// ---------------------------------------------------------------------------
+// Demo epochs. The public demo starts fresh by seeding a new epoch, never by
+// deleting: pages show only the current epoch's agreements, and earlier
+// epochs keep their rows and append-only audit history (src/lib/demo).
+// Triggers in the demo_epochs migration enforce the epoch boundary (nothing
+// in a retired epoch changes), each epoch's limits, and, in demo epochs,
+// reserved example domains for counterparty emails.
+
+enum DemoEpochStatus {
+  PREPARING // being seeded by a reset; not shown yet
+  CURRENT // the one epoch pages show
+  RETIRED // replaced by a newer epoch; kept, read-only
+  ABANDONED // a reset that did not complete; kept, never shown
+}
+
+model DemoEpoch {
+  id                    Int             @id @default(autoincrement())
+  status                DemoEpochStatus
+  // true exactly when CURRENT / PREPARING (unique: at most one of each).
+  currentMarker         Boolean?        @unique
+  preparingMarker       Boolean?        @unique
+  isDemo                Boolean         @default(false)
+  // Limits (null = unlimited) and how much of them is used.
+  agreementLimit        Int?
+  agreementCount        Int             @default(0)
+  linkLimit             Int?
+  linkCount             Int             @default(0)
+  requireExampleDomains Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  // A preparing epoch's claim; an expired one may be abandoned by the next reset.
+  leaseExpiresAt        DateTime?
+  activatedAt           DateTime?
+  // The last change to one of its agreements while CURRENT (null = untouched).
+  lastActivityAt        DateTime?
+  endedAt               DateTime?
+
+  documents Document[]
 }
 
 model Sender {
@@ -154,6 +193,11 @@ model Document {
   voidReason String?
   voidedById String?
 
+  // The demo epoch it belongs to (the current one unless the demo reset,
+  // seeding a new epoch, names another). Never changes.
+  epochId Int @default(dbgenerated("countersign_current_epoch()"))
+
+  epoch         DemoEpoch          @relation(fields: [epochId], references: [id], onDelete: Restrict)
   sender        Sender             @relation(fields: [senderId], references: [id])
   countersigner User?              @relation("DocumentCountersigner", fields: [countersignerId], references: [id], onDelete: Restrict)
   voidedBy      User?              @relation("DocumentVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
@@ -167,6 +211,7 @@ model Document {
   @@index([senderId])
   @@index([status])
   @@index([countersignerId])
+  @@index([epochId])
 }
 
 // A counterparty's single-agreement scoped, expiring signing link. Only the

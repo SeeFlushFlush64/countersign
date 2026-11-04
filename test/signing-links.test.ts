@@ -321,10 +321,10 @@ describe("void", () => {
 
   it("revokes the link and blocks every further step", async () => {
     const a = await makeAgreement(company, "counterpartySigned");
-    await voidDocument(a.id, manager(), "  Wrong counterparty entity —  resending  ");
+    await voidDocument(a.id, manager(), "  Wrong counterparty entity,  resending  ");
 
     const row = await prisma.document.findUniqueOrThrow({ where: { id: a.id } });
-    expect(row.voidReason).toBe("Wrong counterparty entity — resending");
+    expect(row.voidReason).toBe("Wrong counterparty entity, resending");
     expect(row.voidedById).toBe(company.paralegal.userId);
     expect(row.status).toBe(DocumentStatus.VOIDED);
     // The signing history from before the void is kept.
@@ -333,7 +333,7 @@ describe("void", () => {
       where: { documentId: a.id, eventType: "VOIDED" },
     });
     expect(voidEvent.metadata).toEqual({
-      reason: "Wrong counterparty entity — resending",
+      reason: "Wrong counterparty entity, resending",
       statusBeforeVoid: "PARTIALLY_SIGNED",
     });
 

@@ -6,7 +6,7 @@ import { DocumentFlowError } from "@/lib/errors";
 import { dispatchDueMessages, retryDelivery } from "@/lib/delivery/outbox";
 import { DELIVERY_STATUS_LABELS } from "@/lib/labels";
 
-// Every action verifies the session itself — a Server Action is its own
+// Every action verifies the session itself, a Server Action is its own
 // entry point and can be invoked directly.
 
 export type RetryState = { error: string | null; result: string | null };

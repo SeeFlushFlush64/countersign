@@ -12,10 +12,10 @@ const BASE =
   "transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-signal text-ink hover:bg-signal-strong",
+  primary: "bg-accent text-canvas hover:bg-accent-strong",
   secondary:
-    "border border-panel-border bg-panel text-paper hover:border-panel-border-hover hover:bg-panel-hover",
-  ghost: "text-slate hover:bg-panel hover:text-paper",
+    "border border-rule bg-surface text-fg hover:border-rule-strong hover:bg-surface-hover",
+  ghost: "text-muted hover:bg-surface hover:text-fg",
   danger: "border border-danger/40 text-danger hover:bg-danger/10",
 };
 

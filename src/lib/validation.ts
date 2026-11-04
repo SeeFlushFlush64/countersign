@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 // Input rules for everything a user types. Shared by the Server Actions (for
-// friendly form errors) and the domain functions (so no caller — the seed, a
-// test, a future API — can bypass them).
+// friendly form errors) and the domain functions (so no caller, the seed, a
+// test, a future API, can bypass them).
 
 export const LIMITS = {
   title: 200,

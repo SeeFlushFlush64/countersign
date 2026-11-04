@@ -11,21 +11,21 @@ import { formatDateTime } from "@/lib/format";
 type Tone = AgreementView["tone"];
 
 const CURRENT_RING: Record<Tone, string> = {
-  action: "ring-2 ring-signal text-signal",
+  action: "ring-2 ring-accent text-accent",
   waiting: "ring-2 ring-state-waiting text-state-waiting",
   attention: "ring-2 ring-alert text-alert",
-  neutral: "ring-2 ring-slate text-paper",
-  done: "ring-2 ring-slate text-paper",
-  void: "ring-2 ring-slate text-paper",
+  neutral: "ring-2 ring-muted text-fg",
+  done: "ring-2 ring-muted text-fg",
+  void: "ring-2 ring-muted text-fg",
 };
 
 const CURRENT_TEXT: Record<Tone, string> = {
-  action: "text-signal",
+  action: "text-accent",
   waiting: "text-state-waiting",
   attention: "text-alert",
-  neutral: "text-paper",
-  done: "text-paper",
-  void: "text-paper",
+  neutral: "text-fg",
+  done: "text-fg",
+  void: "text-fg",
 };
 
 const SPOKEN = {
@@ -40,20 +40,20 @@ function Marker({ step, index, tone }: { step: RailStep; index: number; tone: To
   switch (step.state) {
     case "done":
       return (
-        <span className={`${base} bg-paper text-ink`}>
+        <span className={`${base} bg-fg text-canvas`}>
           <Check aria-hidden className="size-4" strokeWidth={2.5} />
         </span>
       );
     case "current":
-      return <span className={`${base} bg-ink ${CURRENT_RING[tone]}`}>{index + 1}</span>;
+      return <span className={`${base} bg-canvas ${CURRENT_RING[tone]}`}>{index + 1}</span>;
     case "stopped":
       return (
-        <span className={`${base} bg-ink text-state-void ring-1 ring-state-void`}>
+        <span className={`${base} bg-canvas text-state-void ring-1 ring-state-void`}>
           <Ban aria-hidden className="size-4" />
         </span>
       );
     case "ahead":
-      return <span className={`${base} bg-ink text-slate ring-1 ring-panel-border-hover`}>{index + 1}</span>;
+      return <span className={`${base} bg-canvas text-muted ring-1 ring-rule-strong`}>{index + 1}</span>;
   }
 }
 
@@ -63,7 +63,7 @@ function Connector({ done }: { done: boolean }) {
     <span
       aria-hidden
       className={`absolute top-10 bottom-1 left-4 w-px md:top-4 md:right-3 md:bottom-auto md:left-11 md:h-px md:w-auto ${
-        done ? "bg-slate" : "bg-panel-border-hover"
+        done ? "bg-muted" : "bg-rule-strong"
       }`}
     />
   );
@@ -79,17 +79,17 @@ export function SequenceRail({ view }: { view: AgreementView }) {
           <Connector done={step.state === "done"} />
           <Marker step={step} index={i} tone={tone} />
           <div className="min-w-0 md:mt-3">
-            <p className="text-[15px] leading-snug font-medium text-paper">{step.actor}</p>
-            <p className={`mt-0.5 text-sm ${step.state === "current" ? `font-medium ${CURRENT_TEXT[tone]}` : step.state === "stopped" ? "text-state-void" : "text-slate"}`}>
-              {step.state === "stopped" ? `${step.title} — stopped` : step.title}
+            <p className="text-[15px] leading-snug font-medium text-fg">{step.actor}</p>
+            <p className={`mt-0.5 text-sm ${step.state === "current" ? `font-medium ${CURRENT_TEXT[tone]}` : step.state === "stopped" ? "text-state-void" : "text-muted"}`}>
+              {step.state === "stopped" ? `${step.title} (stopped)` : step.title}
               <span className="sr-only">, step {i + 1}, {SPOKEN[step.state]}</span>
             </p>
             {step.at && (
-              <p className="mt-0.5 text-[13px] text-slate">
+              <p className="mt-0.5 text-[13px] text-muted">
                 <time dateTime={step.at.toISOString()}>{formatDateTime(step.at)}</time>
               </p>
             )}
-            {step.detail && <p className="mt-0.5 text-[13px] text-slate">{step.detail}</p>}
+            {step.detail && <p className="mt-0.5 text-[13px] text-muted">{step.detail}</p>}
           </div>
         </li>
       ))}
@@ -97,15 +97,15 @@ export function SequenceRail({ view }: { view: AgreementView }) {
       {/* The outcome the sequence leads to */}
       <li className="relative flex gap-4 md:block">
         {outcome.kind === "executed" ? (
-          <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-state-done text-ink">
+          <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-state-done text-canvas">
             <FileCheck2 aria-hidden className="size-4" />
           </span>
         ) : outcome.kind === "voided" ? (
-          <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-state-void ring-1 ring-state-void">
+          <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-canvas text-state-void ring-1 ring-state-void">
             <Ban aria-hidden className="size-4" />
           </span>
         ) : (
-          <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-slate ring-1 ring-panel-border-hover">
+          <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-canvas text-muted ring-1 ring-rule-strong">
             <FileCheck2 aria-hidden className="size-4" />
           </span>
         )}
@@ -113,21 +113,21 @@ export function SequenceRail({ view }: { view: AgreementView }) {
           {outcome.kind === "executed" ? (
             <>
               <p className="text-[15px] leading-snug font-medium text-state-done">Executed</p>
-              <p className="mt-0.5 text-[13px] text-slate">
+              <p className="mt-0.5 text-[13px] text-muted">
                 <time dateTime={outcome.at.toISOString()}>{formatDateTime(outcome.at)}</time>
               </p>
             </>
           ) : outcome.kind === "voided" ? (
             <>
               <p className="text-[15px] leading-snug font-medium text-state-void">Voided</p>
-              <p className="mt-0.5 text-[13px] text-slate">
+              <p className="mt-0.5 text-[13px] text-muted">
                 by {outcome.by} · <time dateTime={outcome.at.toISOString()}>{formatDateTime(outcome.at)}</time>
               </p>
             </>
           ) : (
             <>
-              <p className="text-[15px] leading-snug font-medium text-slate">Executed</p>
-              <p className="mt-0.5 text-[13px] text-slate">When both have signed, in this order</p>
+              <p className="text-[15px] leading-snug font-medium text-muted">Executed</p>
+              <p className="mt-0.5 text-[13px] text-muted">When both have signed, in this order</p>
             </>
           )}
         </div>

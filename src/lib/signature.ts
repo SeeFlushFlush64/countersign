@@ -4,7 +4,7 @@ import { PDFDocument } from "pdf-lib";
 // Server-side validation of a drawn signature. The value arrives from a public
 // form, so nothing about it is trusted: it must be a PNG data URL, small, a
 // structurally valid PNG with sane dimensions, and actually decodable.
-// Signatures are never placed into HTML or fetched by anything — after
+// Signatures are never placed into HTML or fetched by anything, after
 // validation only the decoded bytes are used, embedded with pdf-lib.
 
 export const SIGNATURE_LIMITS = {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Caveat, IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
+import { Caveat, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
 import "./globals.css";
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -23,16 +23,21 @@ const signatureFace = Caveat({
   preload: false,
 });
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+// Display face for page titles: the serif of the Plex family, which keeps the
+// look of business forms and ledgers.
+const ibmPlexSerif = IBM_Plex_Serif({
+  variable: "--font-ibm-plex-serif",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "Countersign — Document & E-Signature Demo",
+  title: "Countersign: ordered two-party signing",
   description:
-    "A working document generation and e-signature demo: draft, send, and countersign fictional legal documents end to end.",
+    "Two-party agreements with a fixed signing order: the counterparty signs first, then the company countersigns. Enforced on the server and in the database.",
+  // A shared sample workspace with published accounts: kept out of search engines
+  // everywhere (also the X-Robots-Tag header in next.config.ts and robots.txt).
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
@@ -43,9 +48,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} ${signatureFace.variable} h-full antialiased`}
+      className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} ${ibmPlexSerif.variable} ${signatureFace.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-ink text-paper">
+      <body className="min-h-full flex flex-col bg-canvas text-fg">
         {children}
       </body>
     </html>

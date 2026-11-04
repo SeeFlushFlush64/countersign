@@ -41,7 +41,7 @@ export function CountersignForm({
     <form onSubmit={submit} className="flex flex-col gap-5">
       <SignatureField ref={field} signerName={signerName} onReadyChange={setReady} disabled={pending} />
 
-      <p className="text-[13px] text-slate">
+      <p className="text-[13px] text-muted">
         By countersigning, you sign this agreement electronically as {signerName}, after {counterpartyName}, and it
         is executed immediately. This cannot be undone.
       </p>
@@ -52,7 +52,7 @@ export function CountersignForm({
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-panel-border bg-ink/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-canvas/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
         <button
           type="submit"
           disabled={pending || !ready}

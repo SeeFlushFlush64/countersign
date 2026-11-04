@@ -10,6 +10,8 @@ import { canManage } from "@/lib/permissions";
 import { TEMPLATE_TYPE_LABELS } from "@/lib/labels";
 import { formatLongDate } from "@/lib/format";
 import { ArtifactKind } from "@/generated/prisma/enums";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { viewForStatus } from "@/lib/queue";
 import { SequenceRail } from "@/components/agreement/SequenceRail";
 import { DocumentPanel } from "@/components/agreement/DocumentPanel";
 import { Delivery, Fingerprints, History, Parties } from "@/components/agreement/AgreementDetails";
@@ -24,10 +26,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Agreement · Countersign" };
 
 const HEADLINE_TONE: Record<AgreementView["tone"], string> = {
-  action: "text-signal",
+  action: "text-accent",
   attention: "text-alert",
-  waiting: "text-paper",
-  neutral: "text-paper",
+  waiting: "text-fg",
+  neutral: "text-fg",
   done: "text-state-done",
   void: "text-state-void",
 };
@@ -44,7 +46,7 @@ export default async function AgreementPage({ params }: { params: Promise<{ id: 
   const executedArtifact = agreement.artifacts.find((a) => a.kind === ArtifactKind.EXECUTED);
   const frozenArtifact = agreement.artifacts.find((a) => a.kind === ArtifactKind.FROZEN);
 
-  // The counterparty's current link, from the message that delivered it —
+  // The counterparty's current link, from the message that delivered it -
   // only for someone who manages the agreement, and only while it works.
   const linkMessage = agreement.activeLink
     ? [...agreement.messages].reverse().find((m) => m.signingLinkId === agreement.activeLink!.id && m.linkCiphertext)
@@ -98,7 +100,7 @@ export default async function AgreementPage({ params }: { params: Promise<{ id: 
 
       <Link
         href="/agreements"
-        className="-ml-2 inline-flex h-11 items-center gap-1.5 rounded-md px-2 text-sm text-slate transition-colors hover:text-paper lg:h-8"
+        className="-ml-2 inline-flex h-11 items-center gap-1.5 rounded-md px-2 text-sm text-muted transition-colors hover:text-fg lg:h-8"
       >
         <ArrowLeft aria-hidden className="size-4" />
         Agreements
@@ -106,10 +108,11 @@ export default async function AgreementPage({ params }: { params: Promise<{ id: 
 
       <header className="mt-2 flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-paper lg:text-[1.75rem]">
+          <StatusChip view={viewForStatus(agreement.status, agreement.countersignerId, user.id)} />
+          <h1 className="mt-3 font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-fg lg:text-[1.75rem]">
             {agreement.title}
           </h1>
-          <p className="mt-1.5 text-sm text-slate">
+          <p className="mt-1.5 text-sm text-muted">
             {TEMPLATE_TYPE_LABELS[agreement.templateType]} · with {agreement.counterpartyName} · created{" "}
             {formatLongDate(agreement.createdAt)} by {agreement.sender.name}
           </p>
@@ -130,16 +133,16 @@ export default async function AgreementPage({ params }: { params: Promise<{ id: 
       {/* What happens next, and the one thing this viewer can do about it */}
       <section
         aria-label="Next step"
-        className="mt-8 flex flex-col gap-4 border-y border-panel-border py-5 md:flex-row md:items-center md:justify-between md:gap-10"
+        className="mt-8 flex flex-col gap-4 border-y border-rule py-5 md:flex-row md:items-center md:justify-between md:gap-10"
       >
         <div className="min-w-0">
           <p className={`text-lg leading-snug font-medium ${HEADLINE_TONE[view.tone]}`}>{view.headline}</p>
-          <p className="mt-1 max-w-2xl text-sm text-slate">{view.explanation}</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">{view.explanation}</p>
           {view.action.kind === "share-link" && agreement.activeLink && (
-            <p className="mt-2 text-[13px] text-slate">
-              Demo mode sends no email: share this link with {agreement.counterpartyName}. It expires{" "}
+            <p className="mt-2 text-[13px] text-muted">
+              Signing links appear in the outbox instead of an inbox: share this one with {agreement.counterpartyName}. It expires{" "}
               {formatLongDate(agreement.activeLink.expiresAt)} and is also in the{" "}
-              <Link href="/outbox" className="text-signal hover:underline">
+              <Link href="/outbox" className="text-accent hover:underline">
                 outbox
               </Link>
               .
@@ -147,7 +150,7 @@ export default async function AgreementPage({ params }: { params: Promise<{ id: 
           )}
         </div>
         {hasPrimary && (
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-panel-border bg-ink/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:shrink-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-canvas/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:z-auto md:shrink-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
             <PrimaryAction action={view.action} send={send} reissue={reissue} />
           </div>
         )}
