@@ -103,7 +103,7 @@ export function CreateForm({
           />
           {exampleDomainsOnly && (
             <span id="email-hint" className="text-xs text-slate">
-              This demo never sends email: use an address ending in .example or .test, or at example.com.
+              The sample workspace sends no email. Use an address ending in .example or .test, or at example.com.
             </span>
           )}
         </label>

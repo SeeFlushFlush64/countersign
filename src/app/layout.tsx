@@ -30,10 +30,10 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Countersign — Document & E-Signature Demo",
+  title: "Countersign: ordered two-party signing",
   description:
-    "A working document generation and e-signature demo: draft, send, and countersign fictional legal documents end to end.",
-  // A demo with shared, published accounts: kept out of search engines
+    "Two-party agreements with a fixed signing order: the counterparty signs first, then the company countersigns. Enforced on the server and in the database.",
+  // A shared sample workspace with published accounts: kept out of search engines
   // everywhere (also the X-Robots-Tag header in next.config.ts and robots.txt).
   robots: { index: false, follow: false },
 };

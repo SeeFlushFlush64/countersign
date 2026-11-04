@@ -14,4 +14,4 @@ export function isReservedExampleEmail(email: string): boolean {
 }
 
 export const EXAMPLE_DOMAIN_MESSAGE =
-  "This demo never sends email, so use an example address: one ending in .example or .test, or at example.com (for instance legal@company.example).";
+  "The sample workspace sends no email, so use a reserved sample address: one ending in .example or .test, or at example.com (for instance legal@company.example).";

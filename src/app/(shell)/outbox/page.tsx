@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { dispatchDueAction, retryDeliveryAction } from "./actions";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Demo outbox · Countersign" };
+export const metadata: Metadata = { title: "Outbox · Countersign" };
 
 // The demo outbox: every notification Countersign would have emailed, with
 // what happened to it. In demo mode nothing leaves the app — this page is
@@ -86,12 +86,12 @@ export default async function OutboxPage({
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-[family-name:var(--font-display)] text-2xl leading-tight font-semibold tracking-tight text-paper lg:text-[1.75rem]">
-            Demo outbox
+            Outbox
           </h1>
-          <p className="mt-2 max-w-2xl text-base text-paper">No email is sent.</p>
+          <p className="mt-2 max-w-2xl text-base text-paper">Signing links appear here, not in an inbox.</p>
           <p className="mt-0.5 max-w-2xl text-sm text-slate">
-            Countersign is a demo, so every notification it would email is recorded here instead: who it was for,
-            what it said, and what happened to it.
+            Every notification Countersign issues is recorded here: who it is for, what it says, and what
+            happened to it. Open a signing link from here to act as the counterparty.
           </p>
         </div>
         {messages.some(due) && (

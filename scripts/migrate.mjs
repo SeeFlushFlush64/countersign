@@ -1,13 +1,18 @@
 import "dotenv/config";
 import { spawnSync } from "node:child_process";
 
-// Supabase's transaction pooler (DATABASE_URL, port 6543) hangs the Prisma
-// schema-engine on its advisory-lock step — pgbouncer transaction mode
-// doesn't preserve the session state the engine expects. Migration commands
-// need the direct/session connection (DIRECT_URL, port 5432) instead; app
-// runtime keeps using the pooled DATABASE_URL via the driver adapter, which
-// isn't affected since it never takes an advisory lock.
-process.env.DATABASE_URL = process.env.DIRECT_URL;
+// Migration commands need a direct (non-pooled) connection. A pooler in
+// transaction mode (Neon's -pooler host, Supabase's port 6543) does not keep
+// the session state the Prisma schema engine expects and can hang it, so
+// DIRECT_URL is used when it is set. The running app keeps using the pooled
+// DATABASE_URL through the driver adapter. With no DIRECT_URL (a plain local
+// Postgres) the command falls back to DATABASE_URL, as prisma.config.ts does.
+const target = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+if (!target) {
+  console.error("Set DIRECT_URL (or DATABASE_URL for a plain local Postgres) before running migrations.");
+  process.exit(1);
+}
+process.env.DATABASE_URL = target;
 
 const result = spawnSync("npx", ["prisma", ...process.argv.slice(2)], {
   stdio: "inherit",

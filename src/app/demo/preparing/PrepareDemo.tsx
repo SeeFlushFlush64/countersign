@@ -23,7 +23,7 @@ export function PrepareDemo() {
         else setError(result.error);
       },
       // The request itself failed (a timeout, the network): offer to go on.
-      () => setError("Preparing the demo is taking longer than expected. Continue to try again."),
+      () => setError("Preparing the workspace is taking longer than expected. Continue to try again."),
     );
   }, []);
 

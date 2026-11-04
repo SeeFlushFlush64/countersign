@@ -16,6 +16,6 @@ export async function prepareDemoAction(): Promise<PrepareResult> {
     return { ok: true };
   } catch (error) {
     console.error(`Demo reset failed: ${error instanceof Error ? error.message : String(error)}`);
-    return { ok: false, error: "A fresh demo could not be prepared. The previous one is still available." };
+    return { ok: false, error: "A fresh workspace could not be prepared. The previous one is still available." };
   }
 }

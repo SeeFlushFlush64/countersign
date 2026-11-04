@@ -6,10 +6,10 @@ import { defineConfig } from "prisma/config";
 // src/lib/prisma.ts using the pooled DATABASE_URL.
 //
 // Prisma 7's datasource config has no `directUrl` field, so the CLI gets the
-// direct/session connection (DIRECT_URL, port 5432) as its `url`: the schema
-// engine hangs on Supabase's transaction pooler (port 6543) at its
-// advisory-lock step. Falls back to DATABASE_URL when DIRECT_URL is unset
-// (e.g. a plain local Postgres with no pooler).
+// direct connection (DIRECT_URL) as its `url`: the schema engine can hang on a
+// transaction-mode pooler (Neon's -pooler host) at its advisory-lock step.
+// Falls back to DATABASE_URL when DIRECT_URL is unset (e.g. a plain local
+// Postgres with no pooler).
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {

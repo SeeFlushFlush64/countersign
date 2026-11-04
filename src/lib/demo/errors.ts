@@ -9,17 +9,17 @@ import { DEMO_DEFAULTS } from "@/lib/demo/settings";
 const idleMinutes = Math.round(DEMO_DEFAULTS.idleMs / 60_000);
 
 export const DEMO_EPOCH_CLOSED_MESSAGE =
-  "This agreement belongs to an earlier session of the demo, which has since been reset.";
+  "This agreement belongs to an earlier session of the sample workspace, which has since been reset.";
 
 const MESSAGES = {
   demo_epoch_closed: [DEMO_EPOCH_CLOSED_MESSAGE, "NOT_FOUND"],
   demo_epoch_immutable: [DEMO_EPOCH_CLOSED_MESSAGE, "CONFLICT"],
   demo_agreement_limit: [
-    `The demo has reached its limit of new agreements. It starts fresh once it has been idle for ${idleMinutes} minutes.`,
+    `The sample workspace has reached its limit of new agreements. It starts fresh once it has been idle for ${idleMinutes} minutes.`,
     "CONFLICT",
   ],
   demo_link_limit: [
-    `The demo has reached its limit of signing links. It starts fresh once it has been idle for ${idleMinutes} minutes.`,
+    `The sample workspace has reached its limit of signing links. It starts fresh once it has been idle for ${idleMinutes} minutes.`,
     "CONFLICT",
   ],
   demo_example_domain: [EXAMPLE_DOMAIN_MESSAGE, "INVALID"],

@@ -1,5 +1,8 @@
 {
-  "name": "countersign-demo",
+  "name": "countersign",
+  "author": "Michael Palaganas (https://michaelrhey.com)",
+  "homepage": "https://michaelrhey.com",
+  "description": "Two-party agreements with a server-enforced signing order and a frozen, fingerprinted document.",
   "version": "0.1.0",
   "private": true,
   "scripts": {

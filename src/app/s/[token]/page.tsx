@@ -43,12 +43,12 @@ export default async function SigningRoomPage({ params }: { params: Promise<{ to
             <p>Use the most recent link you received, or ask the person who sent it for a new one.</p>
           </LinkProblem>
         ) : link.state === "reset" ? (
-          <LinkProblem icon={<RotateCcw aria-hidden className="size-6" />} title="This demo has been reset">
+          <LinkProblem icon={<RotateCcw aria-hidden className="size-6" />} title="This workspace has been reset">
             <p>
-              This link belongs to an earlier session of the Countersign demo. The demo starts fresh after a period
-              of inactivity, and earlier agreements are no longer available.
+              This link belongs to an earlier session of the Countersign sample workspace. The workspace starts fresh
+              after a period of inactivity, and earlier agreements are no longer available.
             </p>
-            <p>To try the demo again, start from its home page.</p>
+            <p>To start again, begin from the Countersign home page.</p>
           </LinkProblem>
         ) : link.state === "voided" ? (
           <LinkProblem icon={<Ban aria-hidden className="size-6" />} title="This agreement was voided">

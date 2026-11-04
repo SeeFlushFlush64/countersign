@@ -3,7 +3,7 @@ import { CountersignMark } from "@/components/CountersignMark";
 import { requireUser } from "@/lib/session";
 import { PrepareDemo } from "./PrepareDemo";
 
-export const metadata: Metadata = { title: "Preparing the demo · Countersign" };
+export const metadata: Metadata = { title: "Preparing the workspace · Countersign" };
 
 // Seeding a fresh demo renders its agreements' PDFs, which takes a while.
 export const maxDuration = 120;
@@ -28,11 +28,11 @@ export default async function PreparingDemoPage() {
       <main id="main" className="flex flex-1 justify-center px-4 py-12 sm:py-20">
         <div className="w-full max-w-md">
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-paper">
-            Preparing a fresh demo
+            Preparing a fresh workspace
           </h1>
           <p className="mt-2 text-sm text-slate">
-            The shared demo starts fresh after a period of inactivity, so its example agreements are being set up
-            again. This takes up to half a minute. Earlier sessions are kept, not deleted, but no longer appear.
+            The shared sample workspace starts fresh after a period of inactivity, so its sample agreements are
+            being set up again. This takes up to half a minute. Earlier sessions are kept, not deleted, but no longer appear.
           </p>
           <PrepareDemo />
         </div>

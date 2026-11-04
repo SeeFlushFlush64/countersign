@@ -32,8 +32,8 @@ export const DEMO_LOGIN_PASSWORD = "countersign-demo";
 // Two published demo accounts: a signatory who countersigns every seeded
 // agreement, and a non-signatory who is refused at countersignature.
 export const DEMO_USERS = [
-  { email: DEMO_LOGIN_EMAIL, senderEmail: "dana.whitfield@northlightmedia.com", isSignatory: true },
-  { email: DEMO_PARALEGAL_EMAIL, senderEmail: "tomas.reyes@northlightmedia.com", isSignatory: false },
+  { email: DEMO_LOGIN_EMAIL, senderEmail: "dana.whitfield@northlight.example", isSignatory: true },
+  { email: DEMO_PARALEGAL_EMAIL, senderEmail: "tomas.reyes@northlight.example", isSignatory: false },
 ] as const;
 
 const HOUR = 60 * 60 * 1000;
@@ -62,15 +62,15 @@ export type SeedDocument = {
 };
 
 export const SEED_SENDERS = [
-  { name: "Dana Whitfield", email: "dana.whitfield@northlightmedia.com", role: Role.GENERAL_COUNSEL },
-  { name: "Marcus Ilori", email: "marcus.ilori@northlightmedia.com", role: Role.CONTRACTS_MANAGER },
-  { name: "Priya Anand", email: "priya.anand@northlightmedia.com", role: Role.BUSINESS_AFFAIRS },
-  { name: "Tomás Reyes", email: "tomas.reyes@northlightmedia.com", role: Role.PARALEGAL },
+  { name: "Dana Whitfield", email: "dana.whitfield@northlight.example", role: Role.GENERAL_COUNSEL },
+  { name: "Marcus Ilori", email: "marcus.ilori@northlight.example", role: Role.CONTRACTS_MANAGER },
+  { name: "Priya Anand", email: "priya.anand@northlight.example", role: Role.BUSINESS_AFFAIRS },
+  { name: "Tomás Reyes", email: "tomas.reyes@northlight.example", role: Role.PARALEGAL },
 ];
 
 export const SEED_DOCUMENTS: SeedDocument[] = [
   {
-    senderEmail: "dana.whitfield@northlightmedia.com",
+    senderEmail: "dana.whitfield@northlight.example",
     templateType: "NDA",
     title: "Mutual NDA — Ashgrove Creative LLC",
     counterpartyName: "Ashgrove Creative LLC",
@@ -79,7 +79,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     createdHoursAgo: 11 * 24,
   },
   {
-    senderEmail: "marcus.ilori@northlightmedia.com",
+    senderEmail: "marcus.ilori@northlight.example",
     templateType: "VENDOR_AGREEMENT",
     title: "Vendor Services Agreement — Petrel Logistics Co.",
     counterpartyName: "Petrel Logistics Co.",
@@ -88,7 +88,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     createdHoursAgo: 4 * 24,
   },
   {
-    senderEmail: "priya.anand@northlightmedia.com",
+    senderEmail: "priya.anand@northlight.example",
     templateType: "MEDIA_RELEASE",
     title: "Media Release — Jordan Vance",
     counterpartyName: "Jordan Vance",
@@ -97,7 +97,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     createdHoursAgo: 2 * 24,
   },
   {
-    senderEmail: "tomas.reyes@northlightmedia.com",
+    senderEmail: "tomas.reyes@northlight.example",
     templateType: "LICENSING_ORDER",
     title: "Content Licensing Order — Fenwick Sound Library",
     counterpartyName: "Fenwick Sound Library",
@@ -106,7 +106,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     createdHoursAgo: 3,
   },
   {
-    senderEmail: "marcus.ilori@northlightmedia.com",
+    senderEmail: "marcus.ilori@northlight.example",
     templateType: "NDA",
     title: "Mutual NDA — Blackwood Studio Rentals",
     counterpartyName: "Blackwood Studio Rentals",
@@ -115,7 +115,7 @@ export const SEED_DOCUMENTS: SeedDocument[] = [
     createdHoursAgo: 8 * 24,
   },
   {
-    senderEmail: "priya.anand@northlightmedia.com",
+    senderEmail: "priya.anand@northlight.example",
     templateType: "VENDOR_AGREEMENT",
     title: "Vendor Services Agreement — Halcyon Catering Co.",
     counterpartyName: "Halcyon Catering Co.",

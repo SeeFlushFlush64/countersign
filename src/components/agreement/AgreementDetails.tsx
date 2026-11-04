@@ -112,7 +112,7 @@ export function Delivery({ messages, canRetry }: { messages: DeliveryRow[]; canR
       ? "Nothing sent yet"
       : failed > 0
         ? `${failed} failed`
-        : `${messages.length} in demo outbox`;
+        : `${messages.length} in outbox`;
 
   return (
     <Collapsible title="Delivery" summary={<span className={failed ? "text-danger" : undefined}>{summary}</span>} open={failed > 0}>
@@ -139,7 +139,7 @@ export function Delivery({ messages, canRetry }: { messages: DeliveryRow[]; canR
         </ul>
       )}
       <p className="mt-3 text-xs text-slate">
-        Demo mode sends no email.{" "}
+        Signing links appear in the outbox.{" "}
         <Link href="/outbox" className="text-signal hover:underline">
           Open the outbox
         </Link>

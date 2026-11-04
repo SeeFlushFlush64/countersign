@@ -94,7 +94,7 @@ describe("the database enforces each demo epoch's limits", () => {
     expect(outcome.unexpected).toEqual([]);
     expect(outcome.succeeded).toBe(3);
     expect(outcome.rejected.map((e) => e.message)).toEqual(
-      Array(3).fill(expect.stringMatching(/^The demo has reached its limit of new agreements/)),
+      Array(3).fill(expect.stringMatching(/^The sample workspace has reached its limit of new agreements/)),
     );
     expect(await prisma.document.count({ where: { epochId } })).toBe(3);
     expect((await epochRow(epochId)).agreementCount).toBe(3);
@@ -107,7 +107,7 @@ describe("the database enforces each demo epoch's limits", () => {
     await sendDocument(first.id, { userId: company.paralegal.userId });
 
     const refused = await sendDocument(second.id, { userId: company.paralegal.userId }).catch(flowError);
-    expect(refused).toMatch(/^The demo has reached its limit of signing links/);
+    expect(refused).toMatch(/^The sample workspace has reached its limit of signing links/);
     expect((await prisma.document.findUniqueOrThrow({ where: { id: second.id } })).status).toBe("DRAFT");
     expect((await epochRow(epochId)).linkCount).toBe(1);
   });

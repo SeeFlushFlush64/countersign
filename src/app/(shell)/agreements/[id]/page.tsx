@@ -137,7 +137,7 @@ export default async function AgreementPage({ params }: { params: Promise<{ id: 
           <p className="mt-1 max-w-2xl text-sm text-slate">{view.explanation}</p>
           {view.action.kind === "share-link" && agreement.activeLink && (
             <p className="mt-2 text-[13px] text-slate">
-              Demo mode sends no email: share this link with {agreement.counterpartyName}. It expires{" "}
+              Signing links appear in the outbox instead of an inbox: share this one with {agreement.counterpartyName}. It expires{" "}
               {formatLongDate(agreement.activeLink.expiresAt)} and is also in the{" "}
               <Link href="/outbox" className="text-signal hover:underline">
                 outbox

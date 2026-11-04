@@ -27,7 +27,7 @@ export function RecipientFrame({ children }: { children: React.ReactNode }) {
       </main>
       <footer className="border-t border-panel-border">
         <p className="mx-auto w-full max-w-[72rem] px-4 py-5 text-xs text-slate sm:px-6 lg:px-10">
-          Countersign is a demo. Northlight Media Group and its agreements are fictional.
+          Sample company and agreements. Not legal advice.
         </p>
       </footer>
     </div>
