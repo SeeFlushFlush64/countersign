@@ -343,13 +343,18 @@ export async function seed({
       userIds.set(demo.email, created.id);
       continue;
     }
-    // Keep the roles as documented, and retire the old published password.
+    // Keep the roles as documented, retire the old published password, and keep
+    // the account on the current sender. A database seeded earlier may hold the
+    // account on a sender with a different email (the sample company's address
+    // changed once); the agreements seeded now belong to the current sender, and
+    // only an account on that sender may create them.
     const retired = await bcrypt.compare(RETIRED_SAMPLE_PASSWORD, existingUser.passwordHash);
-    if (retired || existingUser.isSignatory !== demo.isSignatory) {
+    if (retired || existingUser.isSignatory !== demo.isSignatory || existingUser.senderId !== senderId) {
       await prisma.user.update({
         where: { id: existingUser.id },
         data: {
           isSignatory: demo.isSignatory,
+          senderId,
           ...(retired ? { passwordHash: await unusablePasswordHash() } : {}),
         },
       });
